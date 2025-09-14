@@ -4,7 +4,7 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace SocialNetwork.WebAPI.Extensions;
 
-public static class JwtAuthenticationExtension
+public static class JwtAuthenticationExtensions
 {
     public static IServiceCollection AddJwtAuthenticaion(this IServiceCollection services, IConfiguration configuration)
     {

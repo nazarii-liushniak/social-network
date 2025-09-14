@@ -3,7 +3,7 @@ using SocialNetwork.WebAPI.Repositories;
 
 namespace SocialNetwork.WebAPI.Extensions;
 
-public static class RepositoryExtension
+public static class RepositoryExtensions
 {
     public static IServiceCollection AddRepositories(this IServiceCollection services)
     {
