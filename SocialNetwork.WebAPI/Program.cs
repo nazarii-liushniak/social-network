@@ -1,14 +1,9 @@
-using Microsoft.EntityFrameworkCore;
-using SocialNetwork.WebAPI.Data;
 using SocialNetwork.WebAPI.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddDbContext<SocialNetworkDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("SocialNetworkDb"))
-);
-
+builder.Services.AddDbContext(builder.Configuration);
 builder.Services.AddRepositories();
 builder.Services.AddJwtAuthenticaion(builder.Configuration);
 
