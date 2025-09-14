@@ -18,11 +18,11 @@ public class FollowRepository(SocialNetworkDbContext context) : IFollowRepositor
         return follow;
     }
 
-    public async Task<IEnumerable<User>> GetFollowingsByUser(Guid userId)
+    public async Task<IEnumerable<Follow>> GetFollowingsByUser(Guid userId)
     {
         var users = await _context.Follows
             .Where(f => f.FollowerId == userId)
-            .Select(f => f.Followee)
+            .Include(f => f.Followee)
             .ToListAsync();
 
         return users;
