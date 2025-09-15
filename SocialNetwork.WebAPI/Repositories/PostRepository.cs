@@ -34,21 +34,32 @@ public class PostRepository(SocialNetworkDbContext context) :  IPostRepository
         return posts;
     }
 
+    public async Task<IEnumerable<Post>> GetFeed(Guid userId)
+    {
+        var posts = await _context.Follows
+            .Where(f => f.FollowerId == userId)
+            .SelectMany(f => f.Followee.Posts)
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync();
+        
+        return posts;
+    }
+
     public async Task<Post?> UpdatePostAsync(Post post)
     {
         var dbPost = await _context.Posts.FindAsync(post.Id);
-        
+
         if (dbPost == null)
             return null;
-        
-        post.Id =  dbPost.Id;
+
+        post.Id = dbPost.Id;
         post.UserId = dbPost.UserId;
         post.CreatedAt = dbPost.CreatedAt;
-        
+
         _context.Posts.Update(post);
-        
+
         await _context.SaveChangesAsync();
-        
+
         return post;
     }
 
