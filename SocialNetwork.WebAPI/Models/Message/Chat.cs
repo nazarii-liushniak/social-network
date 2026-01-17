@@ -2,7 +2,7 @@ using SocialNetwork.WebAPI.Models.User;
 
 namespace SocialNetwork.WebAPI.Models.Message;
 
-public class Conversation
+public class Chat
 {
     public required ShortProfile Author { get; set; }
     public required string LastMessageContent { get; set; }
