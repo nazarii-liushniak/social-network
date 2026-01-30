@@ -7,16 +7,20 @@ namespace SocialNetwork.WebAPI.Interfaces.Services;
 
 public interface IPostService
 {
-    public SinglePost Post(CreatePost post);
-    public IEnumerable<FeedPost> GetFeed(Guid userId);
-    public SinglePost GetPost(Guid postId);
-    public SinglePost UpdatePost(JsonPatchDocument<CreatePost> post);
-    public bool DeletePost(Guid postId);
-    public bool LikePost(Guid postId);
-    public bool UnlikePost(Guid postId);
-    public IEnumerable<ShortProfile> GetUsersLikedPost(Guid userId);
-    public Comment CreateComment(CreateComment comment);
-    public IEnumerable<Comment> GetComments(Guid postId);
-    public Comment UpdateComment(JsonPatchDocument<Comment> comment);
-    public bool DeleteComment(Guid commentId);
+    public Task<Post> PostAsync(Guid userId, CreateOrUpdatePost post);
+    public Task<Feed?> GetFeedAsync(Guid userId, string? cursor, int limit);
+    public Task<PostWithAuthorAndComments?> GetPostAsync(Guid postId);
+    public Task<bool> UpdatePostAsync(
+        Guid userId,
+        JsonPatchDocument<CreateOrUpdatePost> postPatch);
+    public Task<bool> DeletePostAsync(Guid postId);
+    public Task<bool> LikePostAsync(Guid postId);
+    public Task<bool> UnlikePostAsync(Guid postId);
+    public Task<ShortProfiles?> GetUsersLikedPostAsync(Guid userId, string? cursor, int limit);
+    public Task<Comment?> CreateCommentAsync(Guid userId, CreateOrUpdateComment comment);
+    public Task<Comments?> GetCommentsAsync(Guid postId, string? cursor, int limit);
+    public Task<bool> UpdateCommentAsync(
+        Guid userId,
+        JsonPatchDocument<CreateOrUpdateComment> commentPatch);
+    public Task<bool> DeleteCommentAsync(Guid commentId);
 }

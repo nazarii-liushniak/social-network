@@ -6,13 +6,15 @@ namespace SocialNetwork.WebAPI.Interfaces.Services;
 
 public interface IUserService
 {
-    public Profile GetUserProfile(Guid userId);
-    public UserInfo GetUserInfo(Guid userId);
-    public UserInfo UpdateUser(JsonPatchDocument<UserInfo> userInfo);
-    public bool DeleteUser(Guid userId);
-    public IEnumerable<PostElement> GetPosts(Guid userId);
-    public bool Follow(Guid followerId, Guid followeeId);
-    public bool Unfollow(Guid followerId, Guid followeeId);
-    public IEnumerable<Profile> GetFollowers(Guid userId);
-    public IEnumerable<Profile> GetFollowing(Guid userId);
+    public Task<Profile?> GetUserProfileAsync(Guid userId, int limit);
+    public Task<UserInfo?> GetUserInfoAsync(Guid userId);
+    public Task<bool> UpdateUserAsync(
+        Guid userId,
+        JsonPatchDocument<UpdateUserInfo> userInfoPatch);
+    public Task<bool> DeleteUserAsync(Guid userId);
+    public Task<Posts?> GetPostsAsync(Guid userId, string? cursor, int limit);
+    public Task<bool> FollowAsync(Guid followerId, Guid followeeId);
+    public Task<bool> UnfollowAsync(Guid followerId, Guid followeeId);
+    public Task<ShortProfiles?> GetFollowersAsync(Guid userId, string? cursor, int limit);
+    public Task<ShortProfiles?> GetFollowingAsync(Guid userId, string? cursor, int limit);
 }
