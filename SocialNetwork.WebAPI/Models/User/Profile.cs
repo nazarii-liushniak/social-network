@@ -8,13 +8,13 @@ public class Profile
 {
     public Guid Id { get; set; }
     public required string Username { get; set; }
-    public string? FullName { get; set; }
-    public string? Bio { get; set; }
+    public required string? FullName { get; set; }
+    public required string? Bio { get; set; }
     [Url]
-    public string? ProfileImageUrl { get; set; }
+    public required string? ProfileImageUrl { get; set; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public bool? IsFollowedByMe { get; set; }
-    public int FollowersCount { get; set; }
-    public int FollowingCount { get; set; }
+    public required bool? IsFollowedByMe { get; set; }
+    public required int FollowersCount { get; set; }
+    public required int FollowingCount { get; set; }
     public required Posts PostsPreview { get; set; }
 }
