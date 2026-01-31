@@ -39,5 +39,7 @@ public class MessageConfiguration : IEntityTypeConfiguration<Message>
             .WithMany(u => u.ReceivedMessages)
             .HasForeignKey(m => m.ReceiverId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(m => new { m.SentAt, m.Id });
     }
 }

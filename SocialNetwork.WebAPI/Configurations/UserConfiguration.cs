@@ -44,8 +44,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnName("bio")
             .HasMaxLength(int.MaxValue);
 
-        builder.Property(u => u.ProfilePicture)
-            .HasColumnName("profile_picture")
+        builder.Property(u => u.ProfileImageUrl)
+            .HasColumnName("profile_image_url")
             .HasMaxLength(255);
 
         builder.Property(u => u.CreatedAt)

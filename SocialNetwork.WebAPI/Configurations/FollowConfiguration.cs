@@ -31,5 +31,7 @@ public class FollowConfiguration : IEntityTypeConfiguration<Follow>
             .WithMany(u => u.Followers)
             .HasForeignKey(f => f.FolloweeId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(f => new { f.CreatedAt, f.FollowerId, f.FolloweeId });
     }
 }

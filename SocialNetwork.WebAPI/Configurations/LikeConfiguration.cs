@@ -31,5 +31,7 @@ public class LikeConfiguration : IEntityTypeConfiguration<Like>
             .WithMany(u => u.Likes)
             .HasForeignKey(l => l.UserId)
             .OnDelete(DeleteBehavior.Restrict);
+        
+        builder.HasIndex(l => new { l.CreatedAt, l.UserId, l.PostId });
     }
 }
