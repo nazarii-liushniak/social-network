@@ -7,81 +7,103 @@ namespace SocialNetwork.WebAPI.Repositories;
 
 public class UserRepository(SocialNetworkDbContext context) : IUserRepository
 {
-    private readonly SocialNetworkDbContext _context = context;
-
+    public async Task<bool> ExistsUserAsync(Guid userId)
+    {
+        return await context.Users
+            .AnyAsync(u => u.Id == userId);
+    }
+    
     public async Task<User> AddUserAsync(User user)
     {
-        await _context.Users.AddAsync(user);
+        await context.Users.AddAsync(user);
         
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
         
         return user;
     }
 
     public async Task<User?> GetUserAsync(Guid userId)
     {
-        var user =  await _context.Users.FindAsync(userId);
+        var user =  await context.Users.FindAsync(userId);
         
+        return user;
+    }
+
+    public async Task<User?> GetUserWithPostsAsync(Guid userId, int limit)
+    {
+        var user = await context.Users
+            .Include(u => u.Posts
+                .OrderByDescending(p => p.CreatedAt)
+                .Take(limit))
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
         return user;
     }
 
     public async Task<IEnumerable<User>> GetUsersAsync()
     {
-        var users = await _context.Users.ToListAsync();
+        var users = await context.Users.ToListAsync();
         
         return users;
     }
 
-    public async Task<IEnumerable<User>> GetFollowersAsync(Guid userId)
+    public async Task<IEnumerable<Follow>> GetFollowersAsync(
+        Guid userId,
+        DateTime timestamp,
+        Guid followerId,
+        Guid followeeId,
+        int limit)
     {
-        var users = await _context.Users
+        var users = await context.Users
             .Where(u => u.Id == userId)
             .SelectMany(u => u.Followers)
-            .Select(f => f.Follower)
+            .OrderByDescending(f => f.CreatedAt)
+            .ThenBy(f => new { f.FollowerId, f.FolloweeId })
+            .Where(f => f.CreatedAt > timestamp || 
+                        (f.CreatedAt == timestamp && f.FollowerId > followerId) ||
+                        (f.CreatedAt == timestamp && f.FollowerId == followerId && f.FolloweeId > followeeId))
+            .Take(limit)
+            .Include(f => f.Follower)
             .ToListAsync();
         
         return users;
     }
 
-    public async Task<IEnumerable<User>> GetFollowingsAsync(Guid userId)
+    public async Task<IEnumerable<Follow>> GetFollowingsAsync(
+        Guid userId,
+        DateTime timestamp,
+        Guid followerId,
+        Guid followeeId,
+        int limit)
     {
-        var users = await _context.Users
+        var users = await context.Users
             .Where(u => u.Id == userId)
             .SelectMany(u => u.Followings)
-            .Select(f => f.Followee)
+            .OrderByDescending(f => f.CreatedAt)
+            .ThenBy(f => new { f.FollowerId, f.FolloweeId })
+            .Where(f => f.CreatedAt > timestamp || 
+                        (f.CreatedAt == timestamp && f.FollowerId > followerId) ||
+                        (f.CreatedAt == timestamp && f.FollowerId == followerId && f.FolloweeId > followeeId))
+            .Take(limit)
+            .Include(f => f.Followee)
             .ToListAsync();
         
         return users;
     }
 
-    public async Task<User?> UpdateUserAsync(User user)
+    public async Task UpdateUserAsync(User user)
     {
-        var dbUser = await _context.Users.FindAsync(user.Id);
+        context.Users.Update(user);
         
-        if (dbUser == null)
-            return null;
-        
-        user.Id = dbUser.Id;
-        user.CreatedAt = dbUser.CreatedAt;
-        
-        _context.Users.Update(user);
-        
-        await _context.SaveChangesAsync();
-        
-        return user;
+        await context.SaveChangesAsync();
     }
 
-    public async Task<User?> DeleteUserAsync(Guid id)
+    public async Task<bool> DeleteUserAsync(Guid userId)
     {
-        var user = await _context.Users.FindAsync(id);
+        var deletedRows = await context.Users
+            .Where(u => u.Id == userId)
+            .ExecuteDeleteAsync();
         
-        if (user == null)
-            return null;
-        
-        _context.Users.Remove(user);
-        
-        await _context.SaveChangesAsync();
-        
-        return user;
+        return deletedRows > 0;
     }
 }

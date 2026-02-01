@@ -49,4 +49,29 @@ public class LikeRepository(SocialNetworkDbContext context) : ILikeRepository
         
         return isLiked;
     }
+
+    public async Task<Dictionary<Guid, int>> GetLikesCountByPostIdsAsync(IEnumerable<Guid> postIds)
+    {
+        var postIdList = postIds.ToList();
+        
+        var likeCounts = await _context.Likes
+            .Where(l => postIdList.Contains(l.PostId))
+            .GroupBy(l => l.PostId)
+            .Select(g => new { PostId = g.Key, Count = g.Count() })
+            .ToListAsync();
+        
+        return likeCounts.ToDictionary(x => x.PostId, x => x.Count);
+    }
+
+    public async Task<HashSet<Guid>> GetLikedPostsByUserAsync(Guid userId, IEnumerable<Guid> postIds)
+    {
+        var postIdList = postIds.ToList();
+        
+        var likedPostIds = await _context.Likes
+            .Where(l => l.UserId == userId && postIdList.Contains(l.PostId))
+            .Select(l => l.PostId)
+            .ToListAsync();
+        
+        return new HashSet<Guid>(likedPostIds);
+    }
 }

@@ -25,10 +25,19 @@ public class PostRepository(SocialNetworkDbContext context) :  IPostRepository
         return post;
     }
 
-    public async Task<IEnumerable<Post>> GetPostsAsync(Guid userId)
+    public async Task<IEnumerable<Post>> GetPostsAsync(
+        Guid userId,
+        DateTime? timestamp,
+        Guid postId,
+        int limit)
     {
         var posts = await _context.Posts
             .Where(p => p.UserId == userId)
+            .OrderByDescending(p => p.CreatedAt)
+            .ThenBy(p => p.Id)
+            .Where(p => p.CreatedAt > timestamp || 
+                        (p.CreatedAt == timestamp && p.Id > postId))
+            .Take(limit)
             .ToListAsync();
         
         return posts;

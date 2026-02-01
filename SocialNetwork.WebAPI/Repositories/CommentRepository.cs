@@ -65,4 +65,17 @@ public class CommentRepository(SocialNetworkDbContext context) : ICommentReposit
         
         return comment;
     }
+
+    public async Task<Dictionary<Guid, int>> GetCommentsCountByPostIdsAsync(IEnumerable<Guid> postIds)
+    {
+        var postIdList = postIds.ToList();
+        
+        var commentCounts = await _context.Comments
+            .Where(c => postIdList.Contains(c.PostId))
+            .GroupBy(c => c.PostId)
+            .Select(g => new { PostId = g.Key, Count = g.Count() })
+            .ToListAsync();
+        
+        return commentCounts.ToDictionary(x => x.PostId, x => x.Count);
+    }
 }

@@ -7,20 +7,17 @@ namespace SocialNetwork.WebAPI.Repositories;
 
 public class FollowRepository(SocialNetworkDbContext context) : IFollowRepository
 {
-    private readonly SocialNetworkDbContext _context = context;
 
-    public async Task<Follow> AddFollowAsync(Follow follow)
+    public async Task AddFollowAsync(Follow follow)
     {
-        await _context.Follows.AddAsync(follow);
+        await context.Follows.AddAsync(follow);
         
-        await _context.SaveChangesAsync();
-        
-        return follow;
+        await context.SaveChangesAsync();
     }
 
     public async Task<IEnumerable<Follow>> GetFollowingsByUser(Guid userId)
     {
-        var users = await _context.Follows
+        var users = await context.Follows
             .Where(f => f.FollowerId == userId)
             .Include(f => f.Followee)
             .ToListAsync();
@@ -28,17 +25,32 @@ public class FollowRepository(SocialNetworkDbContext context) : IFollowRepositor
         return users;
     }
 
-    public async Task<Follow?> DeleteFollowAsync(Guid followId)
+    public async Task<bool> DeleteFollowAsync(Guid followerId, Guid followeeId)
     {
-        var follow = await _context.Follows.FindAsync(followId);
+        var deletedRows = await context.Follows
+            .Where(f => f.FollowerId == followerId && f.FolloweeId == followeeId)
+            .ExecuteDeleteAsync();
 
-        if (follow == null)
-            return null;
+        await context.SaveChangesAsync();
 
-        _context.Follows.Remove(follow);
+        return deletedRows > 0;
+    }
 
-        await _context.SaveChangesAsync();
+    public async Task<int> GetFollowersCountAsync(Guid userId)
+    {
+        return await context.Follows
+            .CountAsync(f => f.FolloweeId == userId);
+    }
+    
+    public async Task<int> GetFollowingCountAsync(Guid userId)
+    {
+        return await context.Follows
+            .CountAsync(f => f.FollowerId == userId);
+    }
 
-        return follow;
+    public async Task<bool> IsFollowedByUserAsync(Guid followerId, Guid followeeId)
+    {
+        return await context.Follows
+            .AnyAsync(f => f.FollowerId == followerId && f.FolloweeId == followeeId);
     }
 }
