@@ -7,34 +7,26 @@ namespace SocialNetwork.WebAPI.Repositories;
 
 public class LikeRepository(SocialNetworkDbContext context) : ILikeRepository
 {
-    private readonly SocialNetworkDbContext _context = context;
     
-    public async Task<Like> AddLikeAsync(Like like)
+    public async Task AddLikeAsync(Like like)
     {
-        await _context.Likes.AddAsync(like);
+        await context.Likes.AddAsync(like);
         
-        await _context.SaveChangesAsync();
-        
-        return like;
+        await context.SaveChangesAsync();
     }
 
-    public async Task<Like?> DeleteLikeAsync(Guid likeId)
+    public async Task<bool> DeleteLikeAsync(Guid userId, Guid postId)
     {
-        var like = await _context.Likes.FindAsync(likeId);
+        var deletedRows = await context.Likes
+            .Where(l => l.UserId == userId && l.PostId == postId)
+            .ExecuteDeleteAsync();
         
-        if (like == null)
-            return null;
-        
-        _context.Likes.Remove(like);
-        
-        await _context.SaveChangesAsync();
-        
-        return like;
+        return deletedRows > 0;
     }
 
     public async Task<int> GetLikesCountAsync(Guid postId)
     {
-        var count = await _context.Likes
+        var count = await context.Likes
             .Where(l => l.PostId == postId)
             .CountAsync();
         
@@ -43,7 +35,7 @@ public class LikeRepository(SocialNetworkDbContext context) : ILikeRepository
 
     public async Task<bool> IsLikedAsync(Guid postId, Guid userId)
     {
-        var isLiked = await _context.Likes
+        var isLiked = await context.Likes
             .Where(l => l.PostId == postId && l.UserId == userId)
             .AnyAsync();
         
@@ -54,7 +46,7 @@ public class LikeRepository(SocialNetworkDbContext context) : ILikeRepository
     {
         var postIdList = postIds.ToList();
         
-        var likeCounts = await _context.Likes
+        var likeCounts = await context.Likes
             .Where(l => postIdList.Contains(l.PostId))
             .GroupBy(l => l.PostId)
             .Select(g => new { PostId = g.Key, Count = g.Count() })
@@ -67,11 +59,28 @@ public class LikeRepository(SocialNetworkDbContext context) : ILikeRepository
     {
         var postIdList = postIds.ToList();
         
-        var likedPostIds = await _context.Likes
+        var likedPostIds = await context.Likes
             .Where(l => l.UserId == userId && postIdList.Contains(l.PostId))
             .Select(l => l.PostId)
             .ToListAsync();
         
         return new HashSet<Guid>(likedPostIds);
+    }
+
+    public async Task<IEnumerable<Like>> GetUsersLikedPostAsync(
+        Guid postId,
+        DateTime timestamp,
+        Guid userId)
+    {
+        var users = await context.Likes
+            .Where(l => l.PostId == postId)
+            .OrderByDescending(l => l.CreatedAt)
+            .ThenBy(l => l.UserId)
+            .Where(l => l.CreatedAt < timestamp ||
+                        (l.CreatedAt == timestamp && l.UserId > userId))
+            .Include(l => l.User)
+            .ToListAsync();
+
+        return users;
     }
 }

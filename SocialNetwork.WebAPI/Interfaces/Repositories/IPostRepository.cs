@@ -4,13 +4,20 @@ namespace SocialNetwork.WebAPI.Interfaces.Repositories;
 
 public interface IPostRepository
 {
-    Task<Post> AddPostAsync(Post post);
-    Task<Post?> GetPostAsync(Guid id);
+    Task<bool> ExistsPostAsync(Guid postId);
+    Task AddPostAsync(Post post);
+    Task<Post?> GetPostAsync(Guid postId);
+    Task<Post?> GetPostWithCommentsAsync(Guid postId, int commentsLimit);
     Task<IEnumerable<Post>> GetPostsAsync(
         Guid userId,
         DateTime? timestamp,
         Guid postId,
         int limit);
+    Task<IEnumerable<Post>> GetFeedAsync(
+        Guid userId,
+        DateTime timestamp,
+        Guid postId,
+        int limit);
     Task<Post?> UpdatePostAsync(Post post);
-    Task<Post?> DeletePostAsync(Guid id);
+    Task<bool> DeletePostAsync(Guid postId);
 }

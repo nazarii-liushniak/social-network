@@ -60,7 +60,7 @@ public class UserRepository(SocialNetworkDbContext context) : IUserRepository
             .OrderByDescending(f => f.CreatedAt)
             .ThenBy(f => new { f.FollowerId, f.FolloweeId })
             .Where(f => f.CreatedAt > timestamp || 
-                        (f.CreatedAt == timestamp && f.FollowerId > followerId) ||
+                        (f.CreatedAt == timestamp && f.FollowerId < followerId) ||
                         (f.CreatedAt == timestamp && f.FollowerId == followerId && f.FolloweeId > followeeId))
             .Take(limit)
             .Include(f => f.Follower)
@@ -82,7 +82,7 @@ public class UserRepository(SocialNetworkDbContext context) : IUserRepository
             .OrderByDescending(f => f.CreatedAt)
             .ThenBy(f => new { f.FollowerId, f.FolloweeId })
             .Where(f => f.CreatedAt > timestamp || 
-                        (f.CreatedAt == timestamp && f.FollowerId > followerId) ||
+                        (f.CreatedAt == timestamp && f.FollowerId < followerId) ||
                         (f.CreatedAt == timestamp && f.FollowerId == followerId && f.FolloweeId > followeeId))
             .Take(limit)
             .Include(f => f.Followee)

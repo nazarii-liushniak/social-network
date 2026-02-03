@@ -7,20 +7,17 @@ namespace SocialNetwork.WebAPI.Interfaces.Services;
 
 public interface IPostService
 {
-    public Task<Post> PostAsync(Guid userId, CreateOrUpdatePost post);
+    public Task<Post?> PostAsync(Guid userId, CreateOrUpdatePost post);
     public Task<Feed?> GetFeedAsync(Guid userId, string? cursor, int limit);
-    public Task<PostWithAuthorAndComments?> GetPostAsync(Guid postId);
+    public Task<PostWithAuthorAndComments?> GetPostAsync(
+        Guid currentUserId,
+        Guid postId,
+        int commentsLimit);
     public Task<bool> UpdatePostAsync(
-        Guid userId,
+        Guid postId,
         JsonPatchDocument<CreateOrUpdatePost> postPatch);
     public Task<bool> DeletePostAsync(Guid postId);
-    public Task<bool> LikePostAsync(Guid postId);
-    public Task<bool> UnlikePostAsync(Guid postId);
-    public Task<ShortProfiles?> GetUsersLikedPostAsync(Guid userId, string? cursor, int limit);
-    public Task<Comment?> CreateCommentAsync(Guid userId, CreateOrUpdateComment comment);
-    public Task<Comments?> GetCommentsAsync(Guid postId, string? cursor, int limit);
-    public Task<bool> UpdateCommentAsync(
-        Guid userId,
-        JsonPatchDocument<CreateOrUpdateComment> commentPatch);
-    public Task<bool> DeleteCommentAsync(Guid commentId);
+    public Task<bool> LikePostAsync(Guid userId, Guid postId);
+    public Task<bool> UnlikePostAsync(Guid userId, Guid postId);
+    public Task<ShortProfiles?> GetUsersLikedPostAsync(Guid postId, string? cursor, int limit);
 }
