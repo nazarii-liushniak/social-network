@@ -1,7 +1,7 @@
 namespace SocialNetwork.WebAPI.Models.Post;
 
-public class Posts
+public class Feed
 {
-    public required IEnumerable<Post> Items { get; set; }
+    public required IEnumerable<PostWithAuthor> Items { get; set; }
     public required string NextCursor { get; set; }
 }

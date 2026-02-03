@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.JsonPatch;
-using SocialNetwork.WebAPI.Models.Comment;
 using SocialNetwork.WebAPI.Models.Post;
 using SocialNetwork.WebAPI.Models.User;
 
@@ -7,16 +6,17 @@ namespace SocialNetwork.WebAPI.Interfaces.Services;
 
 public interface IPostService
 {
-    public SinglePost Post(CreatePost post);
-    public IEnumerable<FeedPost> GetFeed(Guid userId);
-    public SinglePost GetPost(Guid postId);
-    public SinglePost UpdatePost(JsonPatchDocument<CreatePost> post);
-    public bool DeletePost(Guid postId);
-    public bool LikePost(Guid postId);
-    public bool UnlikePost(Guid postId);
-    public IEnumerable<ShortProfile> GetUsersLikedPost(Guid userId);
-    public Comment CreateComment(CreateComment comment);
-    public IEnumerable<Comment> GetComments(Guid postId);
-    public Comment UpdateComment(JsonPatchDocument<Comment> comment);
-    public bool DeleteComment(Guid commentId);
+    public Task<Post?> PostAsync(Guid userId, CreateOrUpdatePost post);
+    public Task<Feed?> GetFeedAsync(Guid userId, string? cursor, int limit);
+    public Task<PostWithAuthorAndComments?> GetPostAsync(
+        Guid currentUserId,
+        Guid postId,
+        int commentsLimit);
+    public Task<bool> UpdatePostAsync(
+        Guid postId,
+        JsonPatchDocument<CreateOrUpdatePost> postPatch);
+    public Task<bool> DeletePostAsync(Guid postId);
+    public Task<bool> LikePostAsync(Guid userId, Guid postId);
+    public Task<bool> UnlikePostAsync(Guid userId, Guid postId);
+    public Task<ShortProfiles?> GetUsersLikedPostAsync(Guid postId, string? cursor, int limit);
 }

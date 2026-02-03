@@ -35,5 +35,7 @@ public class PostConfiguration : IEntityTypeConfiguration<Post>
             .WithMany(u => u.Posts)
             .HasForeignKey(p => p.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasIndex(p => new { p.CreatedAt, p.UserId });
     }
 }

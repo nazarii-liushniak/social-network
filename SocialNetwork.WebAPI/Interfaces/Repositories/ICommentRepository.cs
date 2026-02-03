@@ -4,9 +4,14 @@ namespace SocialNetwork.WebAPI.Interfaces.Repositories;
 
 public interface ICommentRepository
 {
-    Task<Comment> AddCommentAsync(Comment comment);
+    Task AddCommentAsync(Comment comment);
     Task<Comment?> GetCommentAsync(Guid id);
-    Task<IEnumerable<Comment>> GetCommentsAsync(Guid postId);
-    Task<Comment?> UpdateCommentAsync(Comment comment);
-    Task<Comment?> DeleteCommentAsync(Guid id);
+    Task<IEnumerable<Comment>> GetCommentsAsync(
+        Guid postId,
+        DateTime timestamp,
+        Guid commentId,
+        int limit);
+    Task SaveChangesAsync();
+    Task<bool> DeleteCommentAsync(Guid id);
+    Task<Dictionary<Guid, int>> GetCommentsCountByPostIdsAsync(IEnumerable<Guid> postIds);
 }

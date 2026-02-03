@@ -7,73 +7,87 @@ namespace SocialNetwork.WebAPI.Repositories;
 
 public class PostRepository(SocialNetworkDbContext context) :  IPostRepository
 {
-    private readonly SocialNetworkDbContext _context = context;
-
-    public async Task<Post> AddPostAsync(Post post)
+    public async Task<bool> ExistsPostAsync(Guid postId)
     {
-        await _context.Posts.AddAsync(post);
+        return await context.Posts
+            .AnyAsync(p => p.Id == postId);
+    }
+
+    public async Task AddPostAsync(Post post)
+    {
+        await context.Posts.AddAsync(post);
         
-        await _context.SaveChangesAsync();
-        
+        await context.SaveChangesAsync();
+    }
+
+    public async Task<Post?> GetPostAsync(Guid postId)
+    {
+        return await context.Posts.FindAsync(postId);
+    }
+
+    public async Task<Post?> GetPostWithCommentsAsync(Guid postId, int commentsLimit)
+    {
+        var post = await context.Posts
+            .Where(p => p.Id == postId)
+            .Include(p => p.User)
+            .Include(p => p.Comments
+                .OrderByDescending(c => c.CreatedAt)
+                .Take(commentsLimit))
+            .ThenInclude(c => c.User)
+            .FirstOrDefaultAsync();
+
         return post;
     }
 
-    public async Task<Post?> GetPostAsync(Guid id)
+    public async Task<IEnumerable<Post>> GetPostsAsync(
+        Guid userId,
+        DateTime? timestamp,
+        Guid postId,
+        int limit)
     {
-        var post = await _context.Posts.FindAsync(id);
-
-        return post;
-    }
-
-    public async Task<IEnumerable<Post>> GetPostsAsync(Guid userId)
-    {
-        var posts = await _context.Posts
+        var posts = await context.Posts
             .Where(p => p.UserId == userId)
+            .OrderByDescending(p => p.CreatedAt)
+            .ThenBy(p => p.Id)
+            .Where(p => p.CreatedAt < timestamp || 
+                        (p.CreatedAt == timestamp && p.Id > postId))
+            .Take(limit)
             .ToListAsync();
         
         return posts;
     }
 
-    public async Task<IEnumerable<Post>> GetFeed(Guid userId)
+    public async Task<IEnumerable<Post>> GetFeedAsync(
+        Guid userId,
+        DateTime timestamp,
+        Guid postId,
+        int limit)
     {
-        var posts = await _context.Follows
+        var posts = await context.Follows
             .Where(f => f.FollowerId == userId)
             .SelectMany(f => f.Followee.Posts)
             .OrderByDescending(p => p.CreatedAt)
+            .ThenBy(p => p.Id)
+            .Where(p => p.CreatedAt < timestamp || 
+                        (p.CreatedAt == timestamp && p.Id > postId))
+            .Take(limit)
+            .Include(p => p.User)
             .ToListAsync();
         
         return posts;
     }
-
-    public async Task<Post?> UpdatePostAsync(Post post)
+    
+    public async Task SaveChangesAsync()
     {
-        var dbPost = await _context.Posts.FindAsync(post.Id);
-
-        if (dbPost == null)
-            return null;
-
-        post.Id = dbPost.Id;
-        post.UserId = dbPost.UserId;
-        post.CreatedAt = dbPost.CreatedAt;
-
-        _context.Posts.Update(post);
-
-        await _context.SaveChangesAsync();
-
-        return post;
+        await context.SaveChangesAsync();
     }
 
-    public async Task<Post?> DeletePostAsync(Guid id)
+    public async Task<bool> DeletePostAsync(Guid postId)
     {
-        var post = await _context.Posts.FindAsync(id);
-        
-        if (post == null)
-            return null;
-        
-        _context.Posts.Remove(post);
-        
-        await _context.SaveChangesAsync();
-        
-        return post;
+        var deletedRows = await context.Posts
+            .Where(p => p.Id == postId)
+            .ExecuteDeleteAsync();
+
+        return deletedRows > 0;
     }
 }

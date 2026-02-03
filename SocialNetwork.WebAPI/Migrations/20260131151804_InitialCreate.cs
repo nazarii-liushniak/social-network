@@ -22,7 +22,7 @@ namespace SocialNetwork.WebAPI.Migrations
                     salt = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
                     full_name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
                     bio = table.Column<string>(type: "nvarchar(max)", maxLength: 2147483647, nullable: true),
-                    profile_picture = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true),
+                    profile_image_url = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true),
                     created_at = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
@@ -156,6 +156,11 @@ namespace SocialNetwork.WebAPI.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "IX_comments_created_at_id",
+                table: "comments",
+                columns: new[] { "created_at", "id" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_comments_post_id",
                 table: "comments",
                 column: "post_id");
@@ -166,9 +171,19 @@ namespace SocialNetwork.WebAPI.Migrations
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
+                name: "IX_follows_created_at_follower_id_followee_id",
+                table: "follows",
+                columns: new[] { "created_at", "follower_id", "followee_id" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_follows_followee_id",
                 table: "follows",
                 column: "followee_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_likes_created_at_user_id_post_id",
+                table: "likes",
+                columns: new[] { "created_at", "user_id", "post_id" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_likes_user_id",
@@ -184,6 +199,16 @@ namespace SocialNetwork.WebAPI.Migrations
                 name: "IX_messages_sender_id",
                 table: "messages",
                 column: "sender_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_messages_sent_at_id",
+                table: "messages",
+                columns: new[] { "sent_at", "id" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_posts_created_at_user_id",
+                table: "posts",
+                columns: new[] { "created_at", "user_id" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_posts_user_id",

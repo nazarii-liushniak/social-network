@@ -12,7 +12,7 @@ using SocialNetwork.WebAPI.Data;
 namespace SocialNetwork.WebAPI.Migrations
 {
     [DbContext(typeof(SocialNetworkDbContext))]
-    [Migration("20260103201418_InitialCreate")]
+    [Migration("20260131151804_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -56,6 +56,8 @@ namespace SocialNetwork.WebAPI.Migrations
 
                     b.HasIndex("UserId");
 
+                    b.HasIndex("CreatedAt", "Id");
+
                     b.ToTable("comments", (string)null);
                 });
 
@@ -77,6 +79,8 @@ namespace SocialNetwork.WebAPI.Migrations
 
                     b.HasIndex("FolloweeId");
 
+                    b.HasIndex("CreatedAt", "FollowerId", "FolloweeId");
+
                     b.ToTable("follows", (string)null);
                 });
 
@@ -97,6 +101,8 @@ namespace SocialNetwork.WebAPI.Migrations
                     b.HasKey("PostId", "UserId");
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("CreatedAt", "UserId", "PostId");
 
                     b.ToTable("likes", (string)null);
                 });
@@ -132,6 +138,8 @@ namespace SocialNetwork.WebAPI.Migrations
 
                     b.HasIndex("SenderId");
 
+                    b.HasIndex("SentAt", "Id");
+
                     b.ToTable("messages", (string)null);
                 });
 
@@ -164,6 +172,8 @@ namespace SocialNetwork.WebAPI.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("CreatedAt", "UserId");
 
                     b.ToTable("posts", (string)null);
                 });
@@ -201,10 +211,10 @@ namespace SocialNetwork.WebAPI.Migrations
                         .HasColumnType("nvarchar(255)")
                         .HasColumnName("password_hash");
 
-                    b.Property<string>("ProfilePicture")
+                    b.Property<string>("ProfileImageUrl")
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)")
-                        .HasColumnName("profile_picture");
+                        .HasColumnName("profile_image_url");
 
                     b.Property<string>("Salt")
                         .IsRequired()
