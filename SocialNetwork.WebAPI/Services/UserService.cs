@@ -117,20 +117,12 @@ public class UserService(
         
         userInfoPatch.ApplyTo(updateUserInfo);
 
-        var updatedUser = new User
-        {
-            Id = user.Id,
-            Username = updateUserInfo.Username,
-            Email = user.Email,
-            PasswordHash = user.PasswordHash,
-            Salt = user.Salt,
-            FullName = updateUserInfo.FullName,
-            Bio = updateUserInfo.Bio,
-            ProfileImageUrl = updateUserInfo.ProfileImageUrl,
-            CreatedAt = user.CreatedAt,
-        };
+        user.Username = updateUserInfo.Username;
+        user.FullName = updateUserInfo.FullName;
+        user.Bio = updateUserInfo.Bio;
+        user.ProfileImageUrl = updateUserInfo.ProfileImageUrl;
         
-        await userRepository.UpdateUserAsync(updatedUser);
+        await userRepository.SaveChangesAsync();
         
         return true;
     }

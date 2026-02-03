@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.JsonPatch;
-using SocialNetwork.WebAPI.Models.Comment;
 using SocialNetwork.WebAPI.Models.Post;
 using SocialNetwork.WebAPI.Models.User;
 

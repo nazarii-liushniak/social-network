@@ -7,70 +7,59 @@ namespace SocialNetwork.WebAPI.Repositories;
 
 public class CommentRepository(SocialNetworkDbContext context) : ICommentRepository
 {
-    private readonly SocialNetworkDbContext _context = context;
 
-    public async Task<Comment> AddCommentAsync(Comment comment)
+    public async Task AddCommentAsync(Comment comment)
     {
-        await _context.Comments.AddAsync(comment);
+        await context.Comments.AddAsync(comment);
         
-        await _context.SaveChangesAsync();
-
-        return comment;
+        await context.SaveChangesAsync();
     }
 
     public async Task<Comment?> GetCommentAsync(Guid id)
     {
-        var comment = await _context.Comments.FindAsync(id);
+        var comment = await context.Comments.FindAsync(id);
         
         return comment;
     }
 
-    public async Task<IEnumerable<Comment>> GetCommentsAsync(Guid postId)
+    public async Task<IEnumerable<Comment>> GetCommentsAsync(
+        Guid postId,
+        DateTime timestamp,
+        Guid commentId,
+        int limit)
     {
-        var comments = await _context.Comments
-            .Where(c => c.PostId == postId).ToListAsync();
+        var comments = await context.Comments
+            .Where(c => c.PostId == postId)
+            .OrderByDescending(c => c.CreatedAt)
+            .ThenBy(c => c.Id)
+            .Where(c => c.CreatedAt < timestamp ||
+                        (c.CreatedAt == timestamp && c.Id > commentId))
+            .Take(limit)
+            .Include(c => c.User)
+            .ToListAsync();
         
         return comments;
     }
 
-    public async Task<Comment?> UpdateCommentAsync(Comment comment)
+    public async Task SaveChangesAsync()
     {
-        var dbComment = await _context.Comments.FindAsync(comment.Id);
-
-        if (dbComment == null)
-            return null;
-        
-        comment.Id = dbComment.Id;
-        comment.PostId = dbComment.PostId;
-        comment.UserId = dbComment.UserId;
-        comment.CreatedAt = dbComment.CreatedAt;
-        
-        _context.Comments.Update(comment);
-        
-        await _context.SaveChangesAsync();
-
-        return comment;
+        await context.SaveChangesAsync();
     }
 
-    public async Task<Comment?> DeleteCommentAsync(Guid id)
+    public async Task<bool> DeleteCommentAsync(Guid id)
     {
-        var comment = await _context.Comments.FindAsync(id);
+        var deletedRows = await context.Comments
+            .Where(c => c.Id == id)
+            .ExecuteDeleteAsync();
         
-        if (comment == null)
-            return null;
-        
-        _context.Comments.Remove(comment);
-        
-        await _context.SaveChangesAsync();
-        
-        return comment;
+        return deletedRows > 0;
     }
 
     public async Task<Dictionary<Guid, int>> GetCommentsCountByPostIdsAsync(IEnumerable<Guid> postIds)
     {
         var postIdList = postIds.ToList();
         
-        var commentCounts = await _context.Comments
+        var commentCounts = await context.Comments
             .Where(c => postIdList.Contains(c.PostId))
             .GroupBy(c => c.PostId)
             .Select(g => new { PostId = g.Key, Count = g.Count() })

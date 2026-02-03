@@ -91,10 +91,8 @@ public class UserRepository(SocialNetworkDbContext context) : IUserRepository
         return users;
     }
 
-    public async Task UpdateUserAsync(User user)
+    public async Task SaveChangesAsync()
     {
-        context.Users.Update(user);
-        
         await context.SaveChangesAsync();
     }
 

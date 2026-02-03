@@ -18,6 +18,6 @@ public interface IPostRepository
         DateTime timestamp,
         Guid postId,
         int limit);
-    Task<Post?> UpdatePostAsync(Post post);
+    Task SaveChangesAsync();
     Task<bool> DeletePostAsync(Guid postId);
 }

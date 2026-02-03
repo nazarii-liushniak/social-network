@@ -191,16 +191,10 @@ public class PostService(
         
         postPatch.ApplyTo(updatePost);
 
-        var updatedPost = new PostEntity
-        {
-            Id = post.Id,
-            UserId = post.UserId,
-            Content = updatePost.Content,
-            ImageUrl = updatePost.ImageUrl,
-            CreatedAt = post.CreatedAt,
-        };
+        post.Content = updatePost.Content;
+        post.ImageUrl = updatePost.ImageUrl;
         
-        await postRepository.UpdatePostAsync(updatedPost);
+        await postRepository.SaveChangesAsync();
 
         return true;
     }

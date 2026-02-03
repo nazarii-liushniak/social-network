@@ -21,6 +21,6 @@ public interface IUserRepository
         Guid followerId,
         Guid followeeId,
         int limit);
-    Task UpdateUserAsync(User user);
+    Task SaveChangesAsync();
     Task<bool> DeleteUserAsync(Guid userId);
 }

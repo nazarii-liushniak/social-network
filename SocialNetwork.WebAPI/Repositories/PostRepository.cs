@@ -76,23 +76,10 @@ public class PostRepository(SocialNetworkDbContext context) :  IPostRepository
         
         return posts;
     }
-
-    public async Task<Post?> UpdatePostAsync(Post post)
+    
+    public async Task SaveChangesAsync()
     {
-        var dbPost = await context.Posts.FindAsync(post.Id);
-
-        if (dbPost == null)
-            return null;
-
-        post.Id = dbPost.Id;
-        post.UserId = dbPost.UserId;
-        post.CreatedAt = dbPost.CreatedAt;
-
-        context.Posts.Update(post);
-
         await context.SaveChangesAsync();
-
-        return post;
     }
 
     public async Task<bool> DeletePostAsync(Guid postId)
