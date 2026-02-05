@@ -17,7 +17,7 @@ public class UserService(
     ICommentRepository commentRepository) : IUserService
 {
     public async Task<Profile?> GetUserProfileAsync(
-        Guid currentUserId,
+        Guid? currentUserId,
         Guid userId,
         int limit)
     {
@@ -29,9 +29,9 @@ public class UserService(
         var followersCount = await followRepository.GetFollowersCountAsync(userId);
         var followingCount = await followRepository.GetFollowingCountAsync(userId);
         
-        var isFollowedByMe = await followRepository.IsFollowedByUserAsync(
-            currentUserId,
-            userId);
+        var isFollowedByMe = currentUserId == null
+            ? (bool?)null
+            : await followRepository.IsFollowedByUserAsync(currentUserId.Value, userId);
 
         var postIds = user.Posts.Select(p => p.Id).ToList();
         
@@ -39,8 +39,9 @@ public class UserService(
             .GetCommentsCountByPostIdsAsync(postIds);
         var likesCountMap = await likeRepository
             .GetLikesCountByPostIdsAsync(postIds);
-        var likedByMeSet = await likeRepository
-            .GetLikedPostsByUserAsync(currentUserId, postIds);
+        var likedByMeSet = currentUserId == null
+            ? null
+            : await likeRepository.GetLikedPostsByUserAsync(currentUserId.Value, postIds);
 
         var posts = user.Posts
             .Select(p => new Post
@@ -50,7 +51,7 @@ public class UserService(
                 ImageUrl = p.ImageUrl,
                 CommentsCount = commentsCountMap.GetValueOrDefault(p.Id),
                 LikesCount = likesCountMap.GetValueOrDefault(p.Id),
-                IsLikedByMe = likedByMeSet.Contains(p.Id),
+                IsLikedByMe = likedByMeSet?.Contains(p.Id),
                 Timestamp = p.CreatedAt,
             })
             .ToList();
@@ -199,6 +200,12 @@ public class UserService(
         if (!followeeExists)
             return false;
 
+        var existsFollow = await followRepository
+            .ExistsFollowAsync(followerId, followeeId);
+
+        if (existsFollow)
+            return true;
+        
         var follow = new Follow
         {
             FollowerId = followerId,
