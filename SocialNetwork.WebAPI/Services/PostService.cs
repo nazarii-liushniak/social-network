@@ -49,7 +49,7 @@ public class PostService(
         };
     }
 
-    public async Task<Feed?> GetFeedAsync(Guid userId, string? cursor, int limit = 50)
+    public async Task<Feed?> GetFeedAsync(Guid userId, string? cursor, int limit)
     {
         var userExists = await userRepository.ExistsUserAsync(userId);
         if (!userExists)
@@ -115,7 +115,7 @@ public class PostService(
     public async Task<PostWithAuthorAndComments?> GetPostAsync(
         Guid currentUserId,
         Guid postId,
-        int commentsLimit = 50)
+        int commentsLimit)
     {
         var post = await postRepository.GetPostWithCommentsAsync(postId, commentsLimit);
         

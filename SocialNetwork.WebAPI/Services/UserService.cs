@@ -19,7 +19,7 @@ public class UserService(
     public async Task<Profile?> GetUserProfileAsync(
         Guid currentUserId,
         Guid userId,
-        int limit = 20)
+        int limit)
     {
         var user = await userRepository.GetUserAsync(userId);
         
@@ -223,7 +223,7 @@ public class UserService(
     public async Task<ShortProfiles?> GetFollowersAsync(
         Guid userId,
         string? cursor,
-        int limit = 50)
+        int limit)
     {
         var userExists = await userRepository.ExistsUserAsync(userId);
         if (!userExists)
@@ -274,7 +274,7 @@ public class UserService(
     public async Task<ShortProfiles?> GetFollowingAsync(
         Guid userId,
         string? cursor,
-        int limit = 50)
+        int limit)
     {
         var userExists = await userRepository.ExistsUserAsync(userId);
         if (!userExists)

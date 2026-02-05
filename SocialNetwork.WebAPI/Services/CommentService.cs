@@ -55,7 +55,7 @@ public class CommentService(
         return commentModel;
     }
 
-    public async Task<Comments?> GetCommentsAsync(Guid postId, string? cursor, int limit = 50)
+    public async Task<Comments?> GetCommentsAsync(Guid postId, string? cursor, int limit)
     {
         var postExists = await postRepository.ExistsPostAsync(postId);
         if (!postExists)
