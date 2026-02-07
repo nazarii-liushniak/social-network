@@ -4,7 +4,7 @@ namespace SocialNetwork.WebAPI.Interfaces.Repositories;
 
 public interface IMessageRepository
 {
-    Task<Message> AddMessageAsync(Message message);
+    Task AddMessageAsync(Message message);
     Task<IEnumerable<Message>> GetMessagesAsync(
         Guid userId,
         Guid otherUserId,
