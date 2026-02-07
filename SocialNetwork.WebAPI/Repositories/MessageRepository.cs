@@ -9,13 +9,11 @@ public class MessageRepository(SocialNetworkDbContext context) : IMessageReposit
 {
     private readonly SocialNetworkDbContext _context = context;
 
-    public async Task<Message> AddMessageAsync(Message message)
+    public async Task AddMessageAsync(Message message)
     {
         await _context.Messages.AddAsync(message);
         
         await _context.SaveChangesAsync();
-        
-        return message;
     }
 
     public async Task<IEnumerable<Message>> GetMessagesAsync(
