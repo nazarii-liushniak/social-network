@@ -9,7 +9,7 @@ public interface IPostService
     public Task<Post?> PostAsync(Guid userId, CreateOrUpdatePost post);
     public Task<Feed?> GetFeedAsync(Guid userId, string? cursor, int limit);
     public Task<PostWithAuthorAndComments?> GetPostAsync(
-        Guid currentUserId,
+        Guid? currentUserId,
         Guid postId,
         int commentsLimit);
     public Task<bool> UpdatePostAsync(

@@ -105,10 +105,11 @@ public class CommentService(
     }
 
     public async Task<bool> UpdateCommentAsync(
-        Guid userId,
+        Guid postId,
+        Guid commentId,
         JsonPatchDocument<CreateOrUpdateComment> commentPatch)
     {
-        var comment = await commentRepository.GetCommentAsync(userId);
+        var comment = await commentRepository.GetCommentAsync(postId, commentId);
         
         if (comment == null)
             return false;
@@ -127,8 +128,8 @@ public class CommentService(
         return true;
     }
 
-    public async Task<bool> DeleteCommentAsync(Guid commentId)
+    public async Task<bool> DeleteCommentAsync(Guid postId, Guid commentId)
     {
-        return await commentRepository.DeleteCommentAsync(commentId);
+        return await commentRepository.DeleteCommentAsync(postId, commentId);
     }
 }
