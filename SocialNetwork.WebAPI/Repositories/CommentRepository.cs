@@ -15,9 +15,11 @@ public class CommentRepository(SocialNetworkDbContext context) : ICommentReposit
         await context.SaveChangesAsync();
     }
 
-    public async Task<Comment?> GetCommentAsync(Guid id)
+    public async Task<Comment?> GetCommentAsync(Guid postId, Guid commentId)
     {
-        var comment = await context.Comments.FindAsync(id);
+        var comment = await context.Comments
+            .Where(c => c.Id == commentId && c.PostId == postId)
+            .SingleOrDefaultAsync();
         
         return comment;
     }
@@ -46,10 +48,10 @@ public class CommentRepository(SocialNetworkDbContext context) : ICommentReposit
         await context.SaveChangesAsync();
     }
 
-    public async Task<bool> DeleteCommentAsync(Guid id)
+    public async Task<bool> DeleteCommentAsync(Guid postId, Guid commentId)
     {
         var deletedRows = await context.Comments
-            .Where(c => c.Id == id)
+            .Where(c => c.Id == commentId && c.PostId == postId)
             .ExecuteDeleteAsync();
         
         return deletedRows > 0;

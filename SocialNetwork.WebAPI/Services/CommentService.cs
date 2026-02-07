@@ -55,7 +55,7 @@ public class CommentService(
         return commentModel;
     }
 
-    public async Task<Comments?> GetCommentsAsync(Guid postId, string? cursor, int limit = 50)
+    public async Task<Comments?> GetCommentsAsync(Guid postId, string? cursor, int limit)
     {
         var postExists = await postRepository.ExistsPostAsync(postId);
         if (!postExists)
@@ -105,10 +105,11 @@ public class CommentService(
     }
 
     public async Task<bool> UpdateCommentAsync(
-        Guid userId,
+        Guid postId,
+        Guid commentId,
         JsonPatchDocument<CreateOrUpdateComment> commentPatch)
     {
-        var comment = await commentRepository.GetCommentAsync(userId);
+        var comment = await commentRepository.GetCommentAsync(postId, commentId);
         
         if (comment == null)
             return false;
@@ -127,8 +128,8 @@ public class CommentService(
         return true;
     }
 
-    public async Task<bool> DeleteCommentAsync(Guid commentId)
+    public async Task<bool> DeleteCommentAsync(Guid postId, Guid commentId)
     {
-        return await commentRepository.DeleteCommentAsync(commentId);
+        return await commentRepository.DeleteCommentAsync(postId, commentId);
     }
 }

@@ -11,7 +11,8 @@ public interface ICommentService
         CreateOrUpdateComment comment);
     public Task<Comments?> GetCommentsAsync(Guid postId, string? cursor, int limit);
     public Task<bool> UpdateCommentAsync(
-        Guid userId,
+        Guid postId,
+        Guid commentId,
         JsonPatchDocument<CreateOrUpdateComment> commentPatch);
-    public Task<bool> DeleteCommentAsync(Guid commentId);
+    public Task<bool> DeleteCommentAsync(Guid postId, Guid commentId);
 }

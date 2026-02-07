@@ -6,7 +6,7 @@ namespace SocialNetwork.WebAPI.Interfaces.Services;
 
 public interface IUserService
 {
-    public Task<Profile?> GetUserProfileAsync(Guid currentUserId, Guid userId, int limit);
+    public Task<Profile?> GetUserProfileAsync(Guid? currentUserId, Guid userId, int limit);
     public Task<UserInfo?> GetUserInfoAsync(Guid userId);
     public Task<bool> UpdateUserAsync(
         Guid userId,

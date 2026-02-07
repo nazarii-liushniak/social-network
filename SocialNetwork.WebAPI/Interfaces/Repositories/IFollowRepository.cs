@@ -4,6 +4,7 @@ namespace SocialNetwork.WebAPI.Interfaces.Repositories;
 
 public interface IFollowRepository
 {
+    Task<bool> ExistsFollowAsync(Guid followerId, Guid followeeId);
     Task AddFollowAsync(Follow follow);
     Task<bool> DeleteFollowAsync(Guid followerId, Guid followeeId);
     Task<int> GetFollowersCountAsync(Guid userId);

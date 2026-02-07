@@ -49,7 +49,7 @@ public class PostService(
         };
     }
 
-    public async Task<Feed?> GetFeedAsync(Guid userId, string? cursor, int limit = 50)
+    public async Task<Feed?> GetFeedAsync(Guid userId, string? cursor, int limit)
     {
         var userExists = await userRepository.ExistsUserAsync(userId);
         if (!userExists)
@@ -113,9 +113,9 @@ public class PostService(
     }
 
     public async Task<PostWithAuthorAndComments?> GetPostAsync(
-        Guid currentUserId,
+        Guid? currentUserId,
         Guid postId,
-        int commentsLimit = 50)
+        int commentsLimit)
     {
         var post = await postRepository.GetPostWithCommentsAsync(postId, commentsLimit);
         
@@ -126,8 +126,9 @@ public class PostService(
             .GetCommentsCountByPostIdsAsync([postId]))[postId];
         var likesCount = (await likeRepository
             .GetLikesCountAsync(postId));
-        var isLikedByMe = (await likeRepository
-            .IsLikedAsync(currentUserId, postId));
+        var isLikedByMe = currentUserId == null
+            ? (bool?)null
+            : await likeRepository.IsLikedAsync(currentUserId.Value, postId);
 
         var postComments = post.Comments
             .Select(c => new Comment

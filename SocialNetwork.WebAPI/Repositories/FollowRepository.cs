@@ -7,6 +7,14 @@ namespace SocialNetwork.WebAPI.Repositories;
 
 public class FollowRepository(SocialNetworkDbContext context) : IFollowRepository
 {
+    public async Task<bool> ExistsFollowAsync(Guid followerId, Guid followeeId)
+    {
+        var existsFollow = await context.Follows
+            .AnyAsync(f => f.FollowerId == followerId
+                           && f.FolloweeId == followeeId);
+        
+        return existsFollow;
+    }
 
     public async Task AddFollowAsync(Follow follow)
     {
