@@ -1,4 +1,5 @@
 using SocialNetwork.WebAPI.Extensions;
+using SocialNetwork.WebAPI.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,5 +30,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<ChatHub>("/hubs/chat");
 
 await app.RunAsync();

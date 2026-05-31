@@ -5,7 +5,9 @@ namespace SocialNetwork.WebAPI.Extensions;
 
 public static class DbContextExtensions
 {
-    public static IServiceCollection AddDbContext(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddDbContext(
+        this IServiceCollection services,
+        IConfiguration configuration)
     {
         services.AddDbContext<SocialNetworkDbContext>(options =>
             options.UseSqlServer(configuration.GetConnectionString("SocialNetworkDb"))
