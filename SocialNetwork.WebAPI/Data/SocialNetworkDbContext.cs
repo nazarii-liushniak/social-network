@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SocialNetwork.WebAPI.Configurations;
+using SocialNetwork.WebAPI.Converters;
 using SocialNetwork.WebAPI.Entities;
 
 namespace SocialNetwork.WebAPI.Data;
@@ -22,5 +23,12 @@ public class SocialNetworkDbContext(DbContextOptions<SocialNetworkDbContext> opt
         new MessageConfiguration().Configure(modelBuilder.Entity<Message>());
         new PostConfiguration().Configure(modelBuilder.Entity<Post>());
         new UserConfiguration().Configure(modelBuilder.Entity<User>());
+    }
+
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        configurationBuilder
+            .Properties<DateTime>()
+            .HaveConversion<UtcDateTimeConverter>();
     }
 }

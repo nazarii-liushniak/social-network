@@ -9,6 +9,6 @@ public class Post
     public DateTime CreatedAt { get; set; }
 
     public User User { get; set; } = null!;
-    public ICollection<Comment> Comments { get; set; } = new List<Comment>();
-    public ICollection<Like> Likes { get; set; } = new List<Like>();
+    public ICollection<Comment> Comments { get; set; } = new HashSet<Comment>();
+    public ICollection<Like> Likes { get; set; } = new HashSet<Like>();
 }
