@@ -19,19 +19,15 @@ public class FollowConfiguration : IEntityTypeConfiguration<Follow>
             .HasColumnName("followee_id");
 
         builder.Property(f => f.CreatedAt)
-            .HasColumnName("created_at")
-            .IsRequired();
+            .HasColumnName("created_at");
 
         builder.HasOne(f => f.Follower)
-            .WithMany(u => u.Followings)
-            .HasForeignKey(f => f.FollowerId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .WithMany(u => u.Followees)
+            .HasForeignKey(f => f.FollowerId);
 
         builder.HasOne(f => f.Followee)
             .WithMany(u => u.Followers)
             .HasForeignKey(f => f.FolloweeId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasIndex(f => new { f.CreatedAt, f.FollowerId, f.FolloweeId });
+            .OnDelete(DeleteBehavior.Restrict); // For SQL Server
     }
 }

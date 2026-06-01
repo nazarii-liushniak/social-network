@@ -20,22 +20,17 @@ public class PostConfiguration : IEntityTypeConfiguration<Post>
 
         builder.Property(p => p.Content)
             .HasColumnName("content")
-            .HasMaxLength(int.MaxValue)
-            .IsRequired();
+            .HasMaxLength(5000);
 
         builder.Property(p => p.ImageUrl)
             .HasColumnName("image_url")
-            .HasMaxLength(255);
+            .HasMaxLength(1000);
 
         builder.Property(p => p.CreatedAt)
-            .HasColumnName("created_at")
-            .IsRequired();
+            .HasColumnName("created_at");
 
         builder.HasOne(p => p.User)
             .WithMany(u => u.Posts)
-            .HasForeignKey(p => p.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        builder.HasIndex(p => new { p.CreatedAt, p.UserId });
+            .HasForeignKey(p => p.UserId);
     }
 }

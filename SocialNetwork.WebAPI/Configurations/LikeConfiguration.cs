@@ -19,19 +19,15 @@ public class LikeConfiguration : IEntityTypeConfiguration<Like>
             .HasColumnName("user_id");
 
         builder.Property(l => l.CreatedAt)
-            .HasColumnName("created_at")
-            .IsRequired();
+            .HasColumnName("created_at");
 
         builder.HasOne(l => l.Post)
             .WithMany(p => p.Likes)
-            .HasForeignKey(l => l.PostId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .HasForeignKey(l => l.PostId);
 
         builder.HasOne(l => l.User)
             .WithMany(u => u.Likes)
             .HasForeignKey(l => l.UserId)
-            .OnDelete(DeleteBehavior.Restrict);
-        
-        builder.HasIndex(l => new { l.CreatedAt, l.UserId, l.PostId });
+            .OnDelete(DeleteBehavior.Restrict); // For SQL Server
     }
 }

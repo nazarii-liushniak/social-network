@@ -23,23 +23,18 @@ public class CommentConfiguration : IEntityTypeConfiguration<Comment>
 
         builder.Property(c => c.Content)
             .HasColumnName("content")
-            .HasMaxLength(int.MaxValue)
-            .IsRequired();
+            .HasMaxLength(5000);
 
         builder.Property(c => c.CreatedAt)
-            .HasColumnName("created_at")
-            .IsRequired();
+            .HasColumnName("created_at");
 
         builder.HasOne(c => c.Post)
             .WithMany(p => p.Comments)
-            .HasForeignKey(c => c.PostId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .HasForeignKey(c => c.PostId);
 
         builder.HasOne(c => c.User)
             .WithMany(u => u.Comments)
             .HasForeignKey(c => c.UserId)
-            .OnDelete(DeleteBehavior.Restrict);
-        
-        builder.HasIndex(c => new { c.CreatedAt, c.Id });
+            .OnDelete(DeleteBehavior.Restrict); // For SQL Server
     }
 }

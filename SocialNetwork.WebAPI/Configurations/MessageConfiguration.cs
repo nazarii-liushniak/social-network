@@ -23,23 +23,18 @@ public class MessageConfiguration : IEntityTypeConfiguration<Message>
 
         builder.Property(m => m.Content)
             .HasColumnName("content")
-            .HasMaxLength(int.MaxValue)
-            .IsRequired();
+            .HasMaxLength(3000);
 
         builder.Property(m => m.SentAt)
-            .HasColumnName("sent_at")
-            .IsRequired();
+            .HasColumnName("sent_at");
 
         builder.HasOne(m => m.Sender)
             .WithMany(u => u.SentMessages)
-            .HasForeignKey(m => m.SenderId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .HasForeignKey(m => m.SenderId);
 
         builder.HasOne(m => m.Receiver)
             .WithMany(u => u.ReceivedMessages)
             .HasForeignKey(m => m.ReceiverId)
             .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasIndex(m => new { m.SentAt, m.Id });
     }
 }
