@@ -78,7 +78,7 @@ public class UserRepository(SocialNetworkDbContext context) : IUserRepository
     {
         var users = await context.Users
             .Where(u => u.Id == userId)
-            .SelectMany(u => u.Followings)
+            .SelectMany(u => u.Followees)
             .OrderByDescending(f => f.CreatedAt)
             .ThenBy(f => new { f.FollowerId, f.FolloweeId })
             .Where(f => f.CreatedAt > timestamp || 

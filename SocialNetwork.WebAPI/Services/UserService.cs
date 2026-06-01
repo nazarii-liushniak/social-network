@@ -62,7 +62,7 @@ public class UserService(
             Id = user.Id,
             Username = user.Username,
             FullName = user.FullName,
-            Bio = user.Bio,
+            Description = user.Description,
             ProfileImageUrl = user.ProfileImageUrl,
             IsFollowedByMe = isFollowedByMe,
             FollowersCount = followersCount,
@@ -92,7 +92,7 @@ public class UserService(
             Username = user.Username,
             Email = user.Email,
             FullName = user.FullName,
-            Bio = user.Bio,
+            Description = user.Description,
             ProfileImageUrl = user.ProfileImageUrl,
         };
         
@@ -112,7 +112,7 @@ public class UserService(
         {
             Username = user.Username,
             FullName = user.FullName,
-            Bio = user.Bio,
+            Description = user.Description,
             ProfileImageUrl = user.ProfileImageUrl,
         };
         
@@ -120,7 +120,7 @@ public class UserService(
 
         user.Username = updateUserInfo.Username;
         user.FullName = updateUserInfo.FullName;
-        user.Bio = updateUserInfo.Bio;
+        user.Description = updateUserInfo.Description;
         user.ProfileImageUrl = updateUserInfo.ProfileImageUrl;
         
         await userRepository.SaveChangesAsync();
