@@ -10,12 +10,17 @@ public static class JwtAuthenticationExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        services
-            .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        var authority = configuration["Auth0:Domain"]
+            ?? throw new InvalidOperationException("Option Auth0:Domain not found in appsettings.json");
+
+        var audience = configuration["Auth0:Audience"]
+            ?? throw new InvalidOperationException("Option Auth0:Audience not found in appsettings.json");
+
+        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
-                options.Authority = $"https://{configuration["Auth0:Domain"]}/";
-                options.Audience = configuration["Auth0:Audience"];
+                options.Authority = $"https://{authority}/";
+                options.Audience = audience;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     NameClaimType = ClaimTypes.NameIdentifier
