@@ -1,146 +1,114 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SocialNetwork.WebAPI.Extensions;
 using SocialNetwork.WebAPI.Interfaces.Services;
+using SocialNetwork.WebAPI.Models;
+using SocialNetwork.WebAPI.Models.Post;
 using SocialNetwork.WebAPI.Models.User;
-using Microsoft.AspNetCore.JsonPatch;
 
 namespace SocialNetwork.WebAPI.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
 public class UsersController(
-    IUserService userService
+    IUserService userService,
+    IPostService postService
 ) : ControllerBase
 {
-    [HttpGet("{userId:guid}")]
-    public async Task<ActionResult<Profile>> GetUser(
-        [FromRoute] Guid userId,
-        [FromQuery] int postsLimit = 20)
+    [HttpGet]
+    public async Task<ActionResult<PagedResponse<ShortProfileResponse>>> GetUsers(
+        [FromQuery] string? cursor,
+        [FromQuery] int limit = 50)
     {
-        var currentUserIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var currentUserId = currentUserIdString == null
-            ? (Guid?)null
-            : Guid.Parse(currentUserIdString);
-        
-        var user = await userService
-            .GetUserProfileAsync(currentUserId, userId, postsLimit);
+        var result = await userService.GetUsersAsync(cursor, limit);
 
-        if (user == null)
-            return NotFound("User not found");
+        return result.ToActionResult();
+    }
+    
+    [HttpGet("{userId:guid}")]
+    public async Task<ActionResult<ProfileResponse>> GetUser([FromRoute] Guid userId)
+    {
+        var result = await userService.GetUserProfileAsync(userId);
         
-        return Ok(user);
+        return result.ToActionResult();
     }
 
     [Authorize]
     [HttpGet("me")]
-    public async Task<ActionResult<UserInfo>> GetMe()
+    public async Task<ActionResult<UserResponse>> GetMe()
     {
-        var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-        var userId = Guid.Parse(userIdString);
+        var result = await userService.GetUserModelAsync();
         
-        var userInfo = await userService.GetUserInfoAsync(userId);
-        
-        return Ok(userInfo);
+        return result.ToActionResult();
     }
 
     [Authorize]
-    [HttpPatch("me")]
-    public async Task<IActionResult> PatchMe(
-        [FromBody] JsonPatchDocument<UpdateUserInfo> userInfoPatch)
+    [HttpPut("me")]
+    public async Task<ActionResult<UserResponse>> UpdateMe([FromBody] UpdateUserModelRequest updateUserModelRequest)
     {
-        var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-        var userId = Guid.Parse(userIdString);
+        var result = await userService.UpdateUserModelAsync(updateUserModelRequest);
         
-        _ = await userService.UpdateUserAsync(userId, userInfoPatch);
-        
-        return NoContent();
+        return result.ToActionResult();
     }
 
     [Authorize]
     [HttpDelete("me")]
     public async Task<IActionResult> DeleteMe()
     {
-        var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-        var userId = Guid.Parse(userIdString);
+        var result = await userService.DeleteUserAsync();
         
-        _ = await userService.DeleteUserAsync(userId);
-        
-        return NoContent();
+        return result.ToActionResult();
     }
     
     [HttpGet("{userId:guid}/posts")]
-    public async Task<ActionResult> GetPosts(
+    public async Task<ActionResult<PagedResponse<PostResponse>>> GetPosts(
         [FromRoute] Guid userId,
         [FromQuery] string? cursor,
         [FromQuery] int limit = 20)
     {
-        var currentUserIdString = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-        var currentUserId = Guid.Parse(currentUserIdString);
+        var result = await postService.GetPostsAsync(userId, cursor, limit);
         
-        var posts = await userService.GetPostsAsync(currentUserId, userId, cursor, limit);
-        
-        if (posts == null)
-            return NotFound("User not found");
-        
-        return Ok(posts);
+        return result.ToActionResult();
     }
 
     [HttpGet("{userId:guid}/followers")]
-    public async Task<ActionResult<ShortProfiles>> GetFollowers(
+    public async Task<ActionResult<PagedResponse<ShortProfileResponse>>> GetFollowers(
         [FromRoute] Guid userId,
         [FromQuery] string? cursor,
-        [FromQuery] int limit = 20)
+        [FromQuery] int limit = 100)
     {
-        var followers = await userService.GetFollowersAsync(userId, cursor, limit);
+        var result = await userService.GetFollowersAsync(userId, cursor, limit);
         
-        if (followers == null)
-            return NotFound("User not found");
-        
-        return Ok(followers);
+        return result.ToActionResult();
     }
 
     [Authorize]
     [HttpPost("{userId:guid}/followers")]
     public async Task<IActionResult> Follow([FromRoute] Guid userId)
     {
-        var currentUserIdString = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-        var currentUserId = Guid.Parse(currentUserIdString);
-
-        var followeeExists = await userService.FollowAsync(currentUserId, userId);
-
-        if (!followeeExists)
-            return NotFound("User not found");
+        var result = await userService.FollowAsync(userId);
         
-        return NoContent();
+        return result.ToActionResult();
     }
 
     [Authorize]
     [HttpDelete("{userId:guid}/followers")]
     public async Task<IActionResult> Unfollow([FromRoute] Guid userId)
     {
-        var currentUserIdString = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-        var currentUserId = Guid.Parse(currentUserIdString);
-
-        var followeeExists = await userService.UnfollowAsync(currentUserId, userId);
+        var result = await userService.UnfollowAsync(userId);
         
-        if (!followeeExists)
-            return NotFound("User not found");
-        
-        return NoContent();
+        return result.ToActionResult();
     }
 
     [HttpGet("{userId:guid}/following")]
-    public async Task<ActionResult<ShortProfiles>> GetFollowing(
+    public async Task<ActionResult<PagedResponse<ShortProfileResponse>>> GetFollowing(
         [FromRoute] Guid userId,
         [FromQuery] string? cursor,
         [FromQuery] int limit = 50)
     {
-        var following = await userService.GetFollowingAsync(userId, cursor, limit);
-
-        if (following == null)
-            return NotFound("User not found");
+        var result = await userService.GetFolloweesAsync(userId, cursor, limit);
         
-        return Ok(following);
+        return result.ToActionResult();
     }
 }

@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SocialNetwork.WebAPI.Extensions;
 using SocialNetwork.WebAPI.Interfaces.Services;
+using SocialNetwork.WebAPI.Models;
 using SocialNetwork.WebAPI.Models.Message;
 
 namespace SocialNetwork.WebAPI.Controllers;
@@ -11,33 +13,36 @@ namespace SocialNetwork.WebAPI.Controllers;
 public class ChatsController(IChatService chatService) : ControllerBase
 {
     [Authorize]
-    [HttpGet]
-    public async Task<ActionResult<IEnumerable<Chat>>> GetChatsAsync()
+    [HttpPost("{otherUserId:guid}")]
+    public async Task<ActionResult<MessageResponse>> SendMessage(
+        [FromRoute] Guid otherUserId,
+        [FromBody] CreateMessageRequest createMessageRequest)
     {
-        var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-        var userId = Guid.Parse(userIdString);
+        var result = await chatService.SendMessageAsync(otherUserId, createMessageRequest);
+
+        return result.ToActionResult();
+    }
+    
+    [Authorize]
+    [HttpGet]
+    public async Task<ActionResult<PagedResponse<ChatResponse>>> GetChatsAsync(
+        [FromQuery] string? cursor,
+        [FromQuery] int limit = 100)
+    {
+        var result = await chatService.GetChatsAsync(cursor, limit);
         
-        // Null suppression used because user with userId ID always exists.
-        var chats = await chatService.GetChatsAsync(userId) ?? [];
-        
-        return Ok(chats);
+        return result.ToActionResult();
     }
 
     [Authorize]
     [HttpGet("{userId:guid}")]
-    public async Task<ActionResult<Messages>> GetMessages(
+    public async Task<ActionResult<PagedResponse<MessageResponse>>> GetMessages(
         [FromRoute] Guid userId,
         [FromQuery] string? cursor,
         [FromQuery] int limit = 100)
     {
-        var currentUserIdString = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-        var currentUserId = Guid.Parse(currentUserIdString);
-
-        var messages = await chatService.GetChatAsync(currentUserId, userId, cursor, limit);
-
-        if (messages == null)
-            return NotFound("User not found");
+        var result = await chatService.GetChatAsync(userId, cursor, limit);
         
-        return Ok(messages);
+        return result.ToActionResult();
     }
 }
