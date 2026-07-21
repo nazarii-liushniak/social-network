@@ -2,85 +2,72 @@ using Microsoft.EntityFrameworkCore;
 using SocialNetwork.WebAPI.Data;
 using SocialNetwork.WebAPI.Entities;
 using SocialNetwork.WebAPI.Interfaces.Repositories;
+using SocialNetwork.WebAPI.Models.User;
 
 namespace SocialNetwork.WebAPI.Repositories;
 
 public class LikeRepository(SocialNetworkDbContext context) : ILikeRepository
 {
-    
-    public async Task AddLikeAsync(Like like)
+    public void AddLike(Like like)
     {
-        await context.Likes.AddAsync(like);
-        
-        await context.SaveChangesAsync();
+        context.Likes.Add(like);
     }
 
-    public async Task<bool> DeleteLikeAsync(Guid userId, Guid postId)
-    {
-        var deletedRows = await context.Likes
-            .Where(l => l.UserId == userId && l.PostId == postId)
-            .ExecuteDeleteAsync();
-        
-        return deletedRows > 0;
-    }
-
-    public async Task<int> GetLikesCountAsync(Guid postId)
-    {
-        var count = await context.Likes
-            .Where(l => l.PostId == postId)
-            .CountAsync();
-        
-        return count;
-    }
-
-    public async Task<bool> IsLikedAsync(Guid postId, Guid userId)
-    {
-        var isLiked = await context.Likes
-            .Where(l => l.PostId == postId && l.UserId == userId)
-            .AnyAsync();
-        
-        return isLiked;
-    }
-
-    public async Task<Dictionary<Guid, int>> GetLikesCountByPostIdsAsync(IEnumerable<Guid> postIds)
-    {
-        var postIdList = postIds.ToList();
-        
-        var likeCounts = await context.Likes
-            .Where(l => postIdList.Contains(l.PostId))
-            .GroupBy(l => l.PostId)
-            .Select(g => new { PostId = g.Key, Count = g.Count() })
-            .ToListAsync();
-        
-        return likeCounts.ToDictionary(x => x.PostId, x => x.Count);
-    }
-
-    public async Task<HashSet<Guid>> GetLikedPostsByUserAsync(Guid userId, IEnumerable<Guid> postIds)
-    {
-        var postIdList = postIds.ToList();
-        
-        var likedPostIds = await context.Likes
-            .Where(l => l.UserId == userId && postIdList.Contains(l.PostId))
-            .Select(l => l.PostId)
-            .ToListAsync();
-        
-        return new HashSet<Guid>(likedPostIds);
-    }
-
-    public async Task<IEnumerable<Like>> GetUsersLikedPostAsync(
+    public async Task<Like?> GetLikeAsync(
+        Guid userId,
         Guid postId,
-        DateTime timestamp,
-        Guid userId)
+        CancellationToken cancellationToken = default)
     {
-        var users = await context.Likes
+        return await context.Likes.FindAsync([postId, userId], cancellationToken);
+    }
+
+    public void DeleteLike(Like like)
+    {
+        context.Likes.Remove(like);
+    }
+
+    public async Task DeleteUserLikes(Guid userId, CancellationToken cancellationToken = default)
+    {
+        await context.Likes
+            .Where(l => l.UserId == userId)
+            .ExecuteDeleteAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ShortProfileResponse>> GetUsersLikedPostAsync(Guid postId,
+        DateTimeOffset? timestamp,
+        Guid? userId,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        limit = Math.Clamp(limit, 0, 100);
+
+        var query = context.Likes
             .Where(l => l.PostId == postId)
             .OrderByDescending(l => l.CreatedAt)
             .ThenBy(l => l.UserId)
-            .Where(l => l.CreatedAt < timestamp ||
-                        (l.CreatedAt == timestamp && l.UserId > userId))
-            .Include(l => l.User)
-            .ToListAsync();
+            .AsQueryable();
 
-        return users;
+        if (timestamp.HasValue && userId.HasValue)
+        {
+            query = query.Where(l => l.CreatedAt < timestamp.Value
+                || (l.CreatedAt == timestamp.Value && l.UserId > userId.Value));
+        }
+        
+        return await query
+            .Take(limit)
+            .Select(l => new ShortProfileResponse()
+            {
+                Id = l.User.Id,
+                Username = l.User.Username,
+                FullName = l.User.FullName,
+                ProfileImageUrl = l.User.ProfileImageUrl,
+                Timestamp = l.CreatedAt,
+            })
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        await context.SaveChangesAsync(cancellationToken);
     }
 }

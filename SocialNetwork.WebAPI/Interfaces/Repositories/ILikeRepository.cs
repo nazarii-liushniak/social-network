@@ -1,17 +1,22 @@
 using SocialNetwork.WebAPI.Entities;
+using SocialNetwork.WebAPI.Models.User;
 
 namespace SocialNetwork.WebAPI.Interfaces.Repositories;
 
 public interface ILikeRepository
 {
-    Task AddLikeAsync(Like like);
-    Task<bool> DeleteLikeAsync(Guid userId, Guid postId);
-    Task<int> GetLikesCountAsync(Guid postId);
-    Task<bool> IsLikedAsync(Guid postId, Guid userId);
-    Task<Dictionary<Guid, int>> GetLikesCountByPostIdsAsync(IEnumerable<Guid> postIds);
-    Task<HashSet<Guid>> GetLikedPostsByUserAsync(Guid userId, IEnumerable<Guid> postIds);
-    Task<IEnumerable<Like>> GetUsersLikedPostAsync(
+    void AddLike(Like like);
+    Task<Like?> GetLikeAsync(
+        Guid userId,
         Guid postId,
-        DateTime timestamp,
-        Guid userId);
+        CancellationToken cancellationToken = default);
+    void DeleteLike(Like like);
+    Task DeleteUserLikes(Guid user, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ShortProfileResponse>> GetUsersLikedPostAsync(
+        Guid postId,
+        DateTimeOffset? timestamp,
+        Guid? userId,
+        int limit,
+        CancellationToken cancellationToken = default);
+    Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }
