@@ -32,7 +32,7 @@ public class CommentConfiguration : IEntityTypeConfiguration<Comment>
             .WithMany(p => p.Comments)
             .HasForeignKey(c => c.PostId);
 
-        builder.HasOne(c => c.User)
+        builder.HasOne(c => c.Author)
             .WithMany(u => u.Comments)
             .HasForeignKey(c => c.UserId)
             .OnDelete(DeleteBehavior.Restrict); // For SQL Server
