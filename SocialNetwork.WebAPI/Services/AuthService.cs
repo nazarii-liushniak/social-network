@@ -88,7 +88,7 @@ public class AuthService(
     public async Task<Result> LogoutAsync(string refreshTokenString, CancellationToken cancellationToken = default)
     {
         if (!Guid.TryParse(refreshTokenString, out var refreshTokenGuid))
-            return Result.Fail(new InvalidRefreshToken($"Refresh token {refreshTokenString} is invalid"));
+            return Result.Fail(new InvalidRefreshTokenError($"Refresh token {refreshTokenString} is invalid"));
         
         var refreshToken = await refreshTokenRepository.GetRefreshTokenAsync(refreshTokenGuid, cancellationToken);
         if (refreshToken == null)
@@ -107,7 +107,7 @@ public class AuthService(
     public async Task<Result<TokensResponse>> RefreshTokensAsync(string refreshTokenString, CancellationToken cancellationToken = default)
     {
         if (!Guid.TryParse(refreshTokenString, out var refreshTokenGuid))
-            return Result.Fail(new InvalidRefreshToken($"Refresh token {refreshTokenString} is invalid"));
+            return Result.Fail(new InvalidRefreshTokenError($"Refresh token {refreshTokenString} is invalid"));
         
         var refreshToken = await refreshTokenRepository.GetRefreshTokenAsync(refreshTokenGuid, cancellationToken);
         if (refreshToken == null)
