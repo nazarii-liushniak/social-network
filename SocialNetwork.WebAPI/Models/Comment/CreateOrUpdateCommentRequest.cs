@@ -1,6 +1,6 @@
 namespace SocialNetwork.WebAPI.Models.Comment;
 
-public class CreateOrUpdateComment
+public record CreateOrUpdateCommentRequest
 {
     public required string Content { get; set; }
 }

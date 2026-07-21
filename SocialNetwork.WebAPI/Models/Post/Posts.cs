@@ -1,7 +1,0 @@
-namespace SocialNetwork.WebAPI.Models.Post;
-
-public class Posts
-{
-    public required IEnumerable<Post> Items { get; set; }
-    public required string NextCursor { get; set; }
-}

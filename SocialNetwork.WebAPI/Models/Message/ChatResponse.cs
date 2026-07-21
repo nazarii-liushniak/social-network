@@ -2,9 +2,9 @@ using SocialNetwork.WebAPI.Models.User;
 
 namespace SocialNetwork.WebAPI.Models.Message;
 
-public class Chat
+public record ChatResponse
 {
-    public required ShortProfile OtherUser { get; set; }
+    public required Author OtherUser { get; set; }
     public required string LastMessageContent { get; set; }
-    public required DateTime LastMessageTimestamp { get; set; }
+    public required DateTimeOffset LastMessageTimestamp { get; set; }
 }
