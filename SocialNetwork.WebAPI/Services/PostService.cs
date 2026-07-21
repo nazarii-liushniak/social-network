@@ -1,291 +1,226 @@
-using System.Runtime.InteropServices.JavaScript;
-using Microsoft.AspNetCore.JsonPatch;
+using FluentResults;
 using SocialNetwork.WebAPI.Entities;
+using SocialNetwork.WebAPI.Errors;
 using SocialNetwork.WebAPI.Helpers;
+using SocialNetwork.WebAPI.Interfaces.Contexts;
 using SocialNetwork.WebAPI.Interfaces.Repositories;
 using SocialNetwork.WebAPI.Interfaces.Services;
-using SocialNetwork.WebAPI.Models.Comment;
+using SocialNetwork.WebAPI.Models;
 using SocialNetwork.WebAPI.Models.Post;
 using SocialNetwork.WebAPI.Models.User;
-using Comment = SocialNetwork.WebAPI.Models.Comment.Comment;
-using Post = SocialNetwork.WebAPI.Models.Post.Post;
-using PostEntity = SocialNetwork.WebAPI.Entities.Post;
 
 namespace SocialNetwork.WebAPI.Services;
 
 public class PostService(
-    IUserRepository userRepository,
+    TimeProvider timeProvider,
+    IUserContext userContext,
     IPostRepository postRepository,
-    ICommentRepository commentRepository,
     ILikeRepository likeRepository
 ) : IPostService
 {
-    public async Task<Post?> PostAsync(Guid userId, CreateOrUpdatePost post)
+    public async Task<Result<PostResponse>> CreatePostAsync(
+        CreateOrUpdatePostRequest createOrUpdatePostRequest,
+        CancellationToken cancellationToken = default)
     {
-        var userExists = await userRepository.ExistsUserAsync(userId);
-        if (!userExists)
-            return null;
-
-        var postEntity = new PostEntity
+        var currentUserId = userContext.UserId!.Value;
+        
+        var post = new Post
         {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            Content = post.Content,
-            ImageUrl = post.ImageUrl,
-            CreatedAt = DateTime.UtcNow,
+            Id = Guid.Empty,
+            UserId = currentUserId,
+            Content = createOrUpdatePostRequest.Content,
+            ImageUrl = createOrUpdatePostRequest.ImageUrl,
+            CreatedAt = timeProvider.GetUtcNow(),
         };
         
-        await postRepository.AddPostAsync(postEntity);
-
-        return new Post
-        {
-            Id = postEntity.Id,
-            Content = postEntity.Content,
-            ImageUrl = postEntity.ImageUrl,
-            CommentsCount = null,
-            LikesCount = null,
-            IsLikedByMe = null,
-            Timestamp = postEntity.CreatedAt,
-        };
+        postRepository.AddPost(post);
+        await postRepository.SaveChangesAsync(cancellationToken);
+        
+        return (await postRepository.GetPostModelAsync(currentUserId, post.Id, cancellationToken))!;
     }
 
-    public async Task<Feed?> GetFeedAsync(Guid userId, string? cursor, int limit)
-    {
-        var userExists = await userRepository.ExistsUserAsync(userId);
-        if (!userExists)
-            return null;
-
-        DateTime timestamp;
-        Guid postId;
-
-        if (cursor == null)
-        {
-            timestamp = DateTime.UtcNow;
-            postId = Guid.Empty;
-        }
-        else
-        {
-            (timestamp, postId) = CursorHelper.ParseCursor(cursor);
-        }
-        
-        var postEntitiesList = (await postRepository
-            .GetFeedAsync(userId, timestamp, postId, limit)).ToList();
-        
-        var postIds = postEntitiesList.Select(p => p.Id).ToList();
-        
-        var commentsCountMap = await commentRepository
-            .GetCommentsCountByPostIdsAsync(postIds);
-        var likesCountMap = await likeRepository
-            .GetLikesCountByPostIdsAsync(postIds);
-        var likedByMeSet = await likeRepository
-            .GetLikedPostsByUserAsync(userId, postIds);
-        
-        var posts = postEntitiesList
-            .Select(p => new PostWithAuthor
-            {
-                Id = p.Id,
-                Author = new ShortProfile
-                {
-                    Id = p.User.Id,
-                    Username = p.User.Username,
-                    FullName = p.User.FullName,
-                    ProfileImageUrl = p.User.ProfileImageUrl,
-                },
-                Content = p.Content,
-                ImageUrl = p.ImageUrl,
-                CommentsCount = commentsCountMap.GetValueOrDefault(p.Id),
-                LikesCount = likesCountMap.GetValueOrDefault(p.Id),
-                IsLikedByMe = likedByMeSet.Contains(p.Id),
-                Timestamp = p.CreatedAt,
-            })
-            .ToList();
-
-        var lastPost = posts.LastOrDefault();
-        var feed = new Feed
-        {
-            Items = posts,
-            NextCursor = CursorHelper.GenerateCursor(
-                lastPost?.Timestamp ?? DateTime.UtcNow,
-                lastPost?.Id ?? Guid.Empty),
-        };
-
-        return feed;
-    }
-
-    public async Task<PostWithAuthorAndComments?> GetPostAsync(
-        Guid? currentUserId,
+    public async Task<Result<PostWithAuthorResponse>> GetPostAsync(
         Guid postId,
-        int commentsLimit)
+        CancellationToken cancellationToken = default)
     {
-        var post = await postRepository.GetPostWithCommentsAsync(postId, commentsLimit);
+        var currentUserId = userContext.UserId;
+        
+        var postWithAuthor = await postRepository.GetPostWithAuthorAsync(currentUserId, postId, cancellationToken);
+        
+        if (postWithAuthor == null)
+            return Result.Fail(new NotFoundError($"Post with ID {postId} not found"));
+        
+        return postWithAuthor;
+    }
+
+    public async Task<Result<PagedResponse<PostWithAuthorResponse>>> GetFeedAsync(
+        string? cursor,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        if (limit is <= 0 or > 100)
+            return Result.Fail(new ValidationError("Limit must be greater than 0 and less than 100"));
+
+        if (!CursorHelper.TryParseCursor(cursor, out var timestamp, out var postId))
+            return Result.Fail(new InvalidCursorError($"Cursor is invalid"));
+        
+        var currentUserId = userContext.UserId!.Value;
+        
+        var postsWithAuthor = await postRepository
+            .GetFeedAsync(currentUserId, timestamp, postId, limit + 1, cancellationToken);
+
+        string? nextCursor = null;
+        if (postsWithAuthor.Count > limit)
+        {
+            postsWithAuthor = postsWithAuthor.SkipLast(1).ToList();
+
+            var lastPostWithAuthor = postsWithAuthor.Last();
+            nextCursor = CursorHelper.GenerateCursor(lastPostWithAuthor.CreatedAt, lastPostWithAuthor.Id);
+        }
+
+        return new PagedResponse<PostWithAuthorResponse>(postsWithAuthor, nextCursor);
+    }
+
+    public async Task<Result<PagedResponse<PostResponse>>> GetPostsAsync(
+        Guid userId,
+        string? cursor,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        if (limit is <= 0 or > 100)
+            return Result.Fail(new ValidationError("Limit must be greater than 0 and less than 100"));
+
+        if (!CursorHelper.TryParseCursor(cursor, out var timestamp, out var postId))
+            return Result.Fail(new InvalidCursorError($"Cursor is invalid"));
+        
+        var currentUserId = userContext.UserId;
+
+        var posts = await postRepository.GetPostsAsync(currentUserId, userId, timestamp, postId, limit + 1, cancellationToken);
+
+        string? nextCursor = null;
+        if (posts.Count > limit)
+        {
+            posts = posts.SkipLast(1).ToList();
+
+            var lastPost = posts.Last();
+            nextCursor = CursorHelper.GenerateCursor(lastPost.CreatedAt, lastPost.Id);
+        }
+
+        return new PagedResponse<PostResponse>(posts, nextCursor);
+    }
+
+    public async Task<Result<PostResponse>> UpdatePostAsync(
+        Guid postId,
+        CreateOrUpdatePostRequest createOrUpdatePostRequest,
+        CancellationToken cancellationToken = default)
+    {
+        var post = await postRepository.GetPostAsync(postId, cancellationToken);
         
         if (post == null)
-            return null;
-
-        var commentsCount = (await commentRepository
-            .GetCommentsCountByPostIdsAsync([postId]))[postId];
-        var likesCount = (await likeRepository
-            .GetLikesCountAsync(postId));
-        var isLikedByMe = currentUserId == null
-            ? (bool?)null
-            : await likeRepository.IsLikedAsync(currentUserId.Value, postId);
-
-        var postComments = post.Comments
-            .Select(c => new Comment
-            {
-                Id = c.Id,
-                Author = new ShortProfile
-                {
-                    Id = c.User.Id,
-                    Username = c.User.Username,
-                    FullName = c.User.FullName,
-                    ProfileImageUrl = c.User.ProfileImageUrl,
-                },
-                Content = c.Content,
-                Timestamp = c.CreatedAt,
-            })
-            .ToList();
-
-        var lastComment = postComments.LastOrDefault();
-        var postWithAuthorAndComments = new PostWithAuthorAndComments
-        {
-            Id = post.Id,
-            Author = new ShortProfile
-            {
-                Id = post.User.Id,
-                Username = post.User.Username,
-                FullName = post.User.FullName,
-                ProfileImageUrl = post.User.ProfileImageUrl,
-            },
-            Content = post.Content,
-            ImageUrl = post.ImageUrl,
-            CommentsCount = commentsCount,
-            CommentsPreview = new Comments
-            {
-                Items = postComments,
-                NextCursor = CursorHelper.GenerateCursor(
-                    lastComment?.Timestamp ?? DateTime.UtcNow,
-                    lastComment?.Id ?? Guid.Empty),
-            },
-            LikesCount = likesCount,
-            IsLikedByMe = isLikedByMe,
-            Timestamp = post.CreatedAt,
-        };
+            return Result.Fail(new NotFoundError($"Post with ID {postId} not found"));
         
-        return postWithAuthorAndComments;
+        var currentUserId = userContext.UserId!.Value;
+        
+        if (post.UserId != currentUserId)
+            return Result.Fail(new ForbiddenError($"Post with ID {postId} not owned by you"));
+
+        post.Content = createOrUpdatePostRequest.Content;
+        post.ImageUrl = createOrUpdatePostRequest.ImageUrl;
+        
+        await postRepository.SaveChangesAsync(cancellationToken);
+
+        return (await postRepository.GetPostModelAsync(currentUserId, postId, cancellationToken))!;
     }
 
-    public async Task<bool> UpdatePostAsync(
-        Guid postId,
-        JsonPatchDocument<CreateOrUpdatePost> postPatch)
+    public async Task<Result> DeletePostAsync(Guid postId, CancellationToken cancellationToken = default)
     {
-        var post = await postRepository.GetPostAsync(postId);
-        
+        var post = await postRepository.GetPostAsync(postId, cancellationToken);
+
         if (post == null)
-            return false;
-
-        var updatePost = new CreateOrUpdatePost
-        {
-            Content = post.Content,
-            ImageUrl = post.ImageUrl,
-        };
+            return Result.Fail(new NotFoundError($"Post with ID {postId} not found"));
         
-        postPatch.ApplyTo(updatePost);
-
-        post.Content = updatePost.Content;
-        post.ImageUrl = updatePost.ImageUrl;
+        var currentUserId = userContext.UserId!.Value;
         
-        await postRepository.SaveChangesAsync();
+        if (post.UserId != currentUserId)
+            return Result.Fail(new ForbiddenError($"Post with ID {postId} not owned by you"));
 
-        return true;
+        postRepository.DeletePost(post);
+        await postRepository.SaveChangesAsync(cancellationToken);
+
+        return Result.Ok();
     }
 
-    public async Task<bool> DeletePostAsync(Guid postId)
+    public async Task<Result> LikePostAsync(Guid postId, CancellationToken cancellationToken = default)
     {
-        return await postRepository.DeletePostAsync(postId);
-    }
-
-    public async Task<bool> LikePostAsync(Guid userId, Guid postId)
-    {
-        var userExists = await userRepository.ExistsUserAsync(userId);
-        if (!userExists)
-            return false;
-
-        var isAlreadyLiked = await likeRepository.IsLikedAsync(userId, postId);
-        if (isAlreadyLiked)
-            return false;
+        var existsPost = await postRepository.ExistsPostAsync(postId, cancellationToken);
+        if (!existsPost)
+            return Result.Fail(new NotFoundError($"Post with ID {postId} not found"));
         
-        var like = new Like
+        var currentUserId = userContext.UserId!.Value;
+        
+        var like = await likeRepository.GetLikeAsync(currentUserId, postId, cancellationToken);
+        if (like != null)
+            return Result.Fail(new AlreadyExistsError($"Post with ID {postId} already liked by user with ID {currentUserId}"));
+        
+        like = new Like
         {
-            UserId = userId,
+            UserId = currentUserId,
             PostId = postId,
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = timeProvider.GetUtcNow(),
         };
             
-        await likeRepository.AddLikeAsync(like);
+        likeRepository.AddLike(like);
+        await likeRepository.SaveChangesAsync(cancellationToken);
 
-        return true;
+        return Result.Ok();
     }
 
-    public async Task<bool> UnlikePostAsync(Guid userId, Guid postId)
+    public async Task<Result> UnlikePostAsync(Guid postId, CancellationToken cancellationToken = default)
     {
-        var userExists = await userRepository.ExistsUserAsync(userId);
-        if (!userExists)
-            return false;
+        var existsPost = await postRepository.ExistsPostAsync(postId, cancellationToken);
+        if (!existsPost)
+            return Result.Fail(new NotFoundError($"Post with ID {postId} not found"));
+        
+        var currentUserId = userContext.UserId!.Value;
 
-        var isAlreadyLiked = await likeRepository.IsLikedAsync(userId, postId);
-        if (!isAlreadyLiked)
-            return false;
-            
-        await likeRepository.DeleteLikeAsync(userId, postId);
+        var like = await likeRepository.GetLikeAsync(currentUserId, postId, cancellationToken);
 
-        return true;
+        if (like == null)
+            return Result.Fail(new NotFoundError($"User with ID {currentUserId} not liked post with ID {postId}"));
+
+        likeRepository.DeleteLike(like);
+        await likeRepository.SaveChangesAsync(cancellationToken);
+
+        return Result.Ok();
     }
 
-    public async Task<ShortProfiles?> GetUsersLikedPostAsync(
+    public async Task<Result<PagedResponse<ShortProfileResponse>>> GetUsersLikedPostAsync(
         Guid postId,
         string? cursor,
-        int limit)
+        int limit,
+        CancellationToken cancellationToken = default)
     {
-        var postExists = await postRepository.ExistsPostAsync(postId);
-        if (!postExists)
-            return null;
+        if (limit is <= 0 or > 100)
+            return Result.Fail(new ValidationError("Limit must be greater than 0 and less than 100"));
 
-        DateTime timestamp;
-        Guid userId;
+        var existsPost = await postRepository.ExistsPostAsync(postId, cancellationToken);
+        if (!existsPost)
+            return Result.Fail(new NotFoundError($"Post with ID {postId} not found"));
 
-        if (cursor == null)
-        {
-            timestamp = DateTime.UtcNow;
-            userId = Guid.Empty;
-        }
-        else
-        {
-            (timestamp, userId) = CursorHelper.ParseCursor(cursor);
-        }
+        if (!CursorHelper.TryParseCursor(cursor, out var timestamp, out var userId))
+            return Result.Fail(new InvalidCursorError($"Cursor is invalid"));
         
-        var likes = (await likeRepository
-            .GetUsersLikedPostAsync(postId, timestamp, userId))
-            .ToList();
+        var shortProfiles = await likeRepository.GetUsersLikedPostAsync(postId, timestamp, userId, limit + 1, cancellationToken);
 
-        var shortProfilesList = likes.Select(u => new ShortProfile
+        string? nextCursor = null;
+        if (shortProfiles.Count > limit)
         {
-            Id = u.User.Id,
-            Username = u.User.Username,
-            FullName = u.User.FullName,
-            ProfileImageUrl = u.User.ProfileImageUrl,
-        })
-        .ToList();
+            shortProfiles = shortProfiles.SkipLast(1).ToList();
 
-        var lastLike = likes.LastOrDefault();
-        var shortProfiles = new ShortProfiles
-        {
-            Items = shortProfilesList,
-            NextCursor = CursorHelper.GenerateCursor(
-                lastLike?.CreatedAt ?? DateTime.UtcNow,
-                lastLike?.UserId ?? Guid.Empty),
-        };
+            var lastShortProfile = shortProfiles.Last();
+            nextCursor = CursorHelper.GenerateCursor(lastShortProfile.Timestamp, lastShortProfile.Id);
+        }
 
-        return shortProfiles;
+        return new PagedResponse<ShortProfileResponse>(shortProfiles, nextCursor);
     }
 }

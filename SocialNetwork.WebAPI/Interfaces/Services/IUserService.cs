@@ -1,24 +1,33 @@
-using Microsoft.AspNetCore.JsonPatch;
-using SocialNetwork.WebAPI.Models.Post;
+using FluentResults;
+using SocialNetwork.WebAPI.Models;
 using SocialNetwork.WebAPI.Models.User;
 
 namespace SocialNetwork.WebAPI.Interfaces.Services;
 
 public interface IUserService
 {
-    public Task<Profile?> GetUserProfileAsync(Guid? currentUserId, Guid userId, int limit);
-    public Task<UserInfo?> GetUserInfoAsync(Guid userId);
-    public Task<bool> UpdateUserAsync(
+    Task<Result<PagedResponse<ShortProfileResponse>>> GetUsersAsync(
+        string? cursor,
+        int limit,
+        CancellationToken cancellationToken = default);
+    Task<Result<ProfileResponse>> GetUserProfileAsync(
         Guid userId,
-        JsonPatchDocument<UpdateUserInfo> userInfoPatch);
-    public Task<bool> DeleteUserAsync(Guid userId);
-    public Task<Posts?> GetPostsAsync(
-        Guid currentUserId,
+        CancellationToken cancellationToken = default);
+    Task<Result<UserResponse>> GetUserModelAsync(CancellationToken cancellationToken = default);
+    Task<Result<UserResponse>> UpdateUserModelAsync(
+        UpdateUserModelRequest updateUserModelRequest,
+        CancellationToken cancellationToken = default);
+    Task<Result> DeleteUserAsync(CancellationToken cancellationToken = default);
+    Task<Result> FollowAsync(Guid followeeId, CancellationToken cancellationToken = default);
+    Task<Result> UnfollowAsync(Guid followeeId, CancellationToken cancellationToken = default);
+    Task<Result<PagedResponse<ShortProfileResponse>>> GetFollowersAsync(
         Guid userId,
         string? cursor,
-        int limit);
-    public Task<bool> FollowAsync(Guid followerId, Guid followeeId);
-    public Task<bool> UnfollowAsync(Guid followerId, Guid followeeId);
-    public Task<ShortProfiles?> GetFollowersAsync(Guid userId, string? cursor, int limit);
-    public Task<ShortProfiles?> GetFollowingAsync(Guid userId, string? cursor, int limit);
+        int limit,
+        CancellationToken cancellationToken = default);
+    Task<Result<PagedResponse<ShortProfileResponse>>> GetFolloweesAsync(
+        Guid userId,
+        string? cursor,
+        int limit,
+        CancellationToken cancellationToken = default);
 }

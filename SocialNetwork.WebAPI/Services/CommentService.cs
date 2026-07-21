@@ -1,135 +1,115 @@
-using Microsoft.AspNetCore.JsonPatch;
+using FluentResults;
+using SocialNetwork.WebAPI.Entities;
+using SocialNetwork.WebAPI.Errors;
 using SocialNetwork.WebAPI.Helpers;
+using SocialNetwork.WebAPI.Interfaces.Contexts;
 using SocialNetwork.WebAPI.Interfaces.Repositories;
 using SocialNetwork.WebAPI.Interfaces.Services;
+using SocialNetwork.WebAPI.Models;
 using SocialNetwork.WebAPI.Models.Comment;
-using SocialNetwork.WebAPI.Models.User;
-using CommentEntity = SocialNetwork.WebAPI.Entities.Comment;
 
 namespace SocialNetwork.WebAPI.Services;
 
 public class CommentService(
-    IUserRepository userRepository,
+    TimeProvider timeProvider,
+    IUserContext userContext,
     IPostRepository postRepository,
     ICommentRepository commentRepository
 ) : ICommentService
 {
-    public async Task<Comment?> CreateCommentAsync(
-        Guid userId,
+    public async Task<Result<CommentResponse>> CreateCommentAsync(
         Guid postId,
-        CreateOrUpdateComment comment)
+        CreateOrUpdateCommentRequest createOrUpdateCommentRequest,
+        CancellationToken cancellationToken = default)
     {
-        var postExists = await postRepository.ExistsPostAsync(userId);
-        if (!postExists)
-            return null;
+        var existsPost = await postRepository.ExistsPostAsync(postId, cancellationToken);
+        if (!existsPost)
+            return Result.Fail(new NotFoundError($"Post with ID {postId} not found"));
+        
+        var currentUserId = userContext.UserId!.Value;
 
-        var commentEntity = new CommentEntity
+        var comment = new Comment
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.Empty,
             PostId = postId,
-            UserId = userId,
-            Content = comment.Content,
-            CreatedAt = DateTime.UtcNow,
+            UserId = currentUserId,
+            Content = createOrUpdateCommentRequest.Content,
+            CreatedAt = timeProvider.GetUtcNow(),
         };
 
-        await commentRepository.AddCommentAsync(commentEntity);
-        
-        var user = await userRepository.GetUserAsync(userId);
-        if (user == null)
-            return null;
+        commentRepository.AddComment(comment);
+        await commentRepository.SaveChangesAsync(cancellationToken);
 
-        var commentModel = new Comment
-        {
-            Id = commentEntity.Id,
-            Author = new ShortProfile
-            {
-                Id = user.Id,
-                Username = user.Username,
-                FullName = user.FullName,
-                ProfileImageUrl = user.ProfileImageUrl,
-            },
-            Content = commentEntity.Content,
-            Timestamp = commentEntity.CreatedAt,
-        };
-        
-        return commentModel;
+        return (await commentRepository.GetCommentModelAsync(comment.Id, cancellationToken))!;
     }
 
-    public async Task<Comments?> GetCommentsAsync(Guid postId, string? cursor, int limit)
+    public async Task<Result<PagedResponse<CommentResponse>>> GetCommentsAsync(
+        Guid postId,
+        string? cursor,
+        int limit,
+        CancellationToken cancellationToken = default)
     {
-        var postExists = await postRepository.ExistsPostAsync(postId);
-        if (!postExists)
-            return null;
-        
-        DateTime timestamp;
-        Guid commentId;
+        if (limit is <= 0 or > 100)
+            return Result.Fail(new ValidationError("Limit must be greater than 0 and less than 100"));
 
-        if (cursor == null)
-        {
-            timestamp = DateTime.UtcNow;
-            commentId = Guid.Empty;
-        }
-        else
-        {
-            (timestamp, commentId) = CursorHelper.ParseCursor(cursor);
-        }
+        var existsPost = await postRepository.ExistsPostAsync(postId, cancellationToken);
+        if (!existsPost)
+            return Result.Fail(new NotFoundError($"Post with ID {postId} not found"));
+        
+        if (!CursorHelper.TryParseCursor(cursor, out var timestamp, out var commentId))
+            return Result.Fail(new InvalidCursorError($"Cursor is invalid"));
 
         var comments = await commentRepository
-            .GetCommentsAsync(postId, timestamp, commentId, limit);
+            .GetCommentsAsync(postId, timestamp, commentId, limit, cancellationToken);
 
-        var commentsList = comments.Select(c => new Comment
+        string? nextCursor = null;
+        if (comments.Count > limit)
         {
-            Id = c.Id,
-            Author = new ShortProfile
-            {
-                Id = c.User.Id,
-                Username = c.User.Username,
-                FullName = c.User.FullName,
-                ProfileImageUrl = c.User.ProfileImageUrl,
-            },
-            Content = c.Content,
-            Timestamp = c.CreatedAt,
-        })
-        .ToList();
-        
-        var lastComment = commentsList.LastOrDefault();
-        var commentsModel = new Comments
-        {
-            Items = commentsList,
-            NextCursor = CursorHelper.GenerateCursor(
-                lastComment?.Timestamp ?? DateTime.UtcNow,
-                lastComment?.Id ?? Guid.Empty),
-        };
+            comments = comments.SkipLast(1).ToList();
 
-        return commentsModel;
+            var lastComment = comments.Last();
+            nextCursor = CursorHelper.GenerateCursor(lastComment.CreatedAt, lastComment.Id);
+        }
+
+        return new PagedResponse<CommentResponse>(comments, nextCursor);
     }
 
-    public async Task<bool> UpdateCommentAsync(
-        Guid postId,
+    public async Task<Result<CommentResponse>> UpdateCommentAsync(
         Guid commentId,
-        JsonPatchDocument<CreateOrUpdateComment> commentPatch)
+        CreateOrUpdateCommentRequest createOrUpdateCommentRequest,
+        CancellationToken cancellationToken = default)
     {
-        var comment = await commentRepository.GetCommentAsync(postId, commentId);
-        
+        var comment = await commentRepository.GetCommentModelAsync(commentId, cancellationToken);
+
         if (comment == null)
-            return false;
-
-        var updateComment = new CreateOrUpdateComment
-        {
-            Content = comment.Content,
-        };
+            return Result.Fail(new NotFoundError($"Comment with ID {commentId} not found"));
         
-        commentPatch.ApplyTo(updateComment);
-        
-        comment.Content = updateComment.Content;
+        var currentUserId = userContext.UserId!.Value;
 
-        await commentRepository.SaveChangesAsync();
+        if (comment.Author.Id != currentUserId)
+            return Result.Fail(new ForbiddenError($"Comment with {commentId} not owned by you"));
 
-        return true;
+        comment.Content = createOrUpdateCommentRequest.Content;
+        await commentRepository.SaveChangesAsync(cancellationToken);
+
+        return (await commentRepository.GetCommentModelAsync(comment.Id, cancellationToken))!;
     }
 
-    public async Task<bool> DeleteCommentAsync(Guid postId, Guid commentId)
+    public async Task<Result> DeleteCommentAsync(Guid commentId, CancellationToken cancellationToken = default)
     {
-        return await commentRepository.DeleteCommentAsync(postId, commentId);
+        var comment = await commentRepository.GetCommentAsync(commentId, cancellationToken);
+
+        if (comment == null)
+            return Result.Fail(new NotFoundError($"Comment with ID {commentId} not found"));
+        
+        var currentUserId = userContext.UserId!.Value;
+
+        if (comment.UserId != currentUserId)
+            return Result.Fail(new ForbiddenError($"Comment with ID {commentId} not owned by you"));
+        
+        commentRepository.DeleteComment(comment);
+        await commentRepository.SaveChangesAsync(cancellationToken);
+
+        return Result.Ok();
     }
 }
