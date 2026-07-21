@@ -10,7 +10,7 @@ public static class DbContextExtensions
         IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("SocialNetworkDb") 
-            ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found in appsettings.json.");
+            ?? throw new InvalidOperationException("Connection string 'SocialNetworkDb' not found in appsettings.json.");
         
         services.AddDbContext<SocialNetworkDbContext>(options =>
             options.UseSqlServer(connectionString)

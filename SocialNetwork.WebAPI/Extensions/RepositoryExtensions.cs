@@ -12,6 +12,7 @@ public static class RepositoryExtensions
         services.AddScoped<ILikeRepository, LikeRepository>();
         services.AddScoped<IMessageRepository, MessageRepository>();
         services.AddScoped<IPostRepository, PostRepository>();
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
 
         return services;

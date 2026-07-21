@@ -7,10 +7,12 @@ public static class ServiceExtensions
 {
     public static IServiceCollection AddServices(this IServiceCollection services)
     {
-        services.AddScoped<IUserService, UserService>();
-        services.AddScoped<IPostService, PostService>();
-        services.AddScoped<ICommentService, CommentService>();
+        services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IChatService, ChatService>();
+        services.AddScoped<ICommentService, CommentService>();
+        services.AddScoped<IPostService, PostService>();
+        services.AddScoped<ITokenService, TokenService>();
+        services.AddScoped<IUserService, UserService>();
         
         return services;
     }
