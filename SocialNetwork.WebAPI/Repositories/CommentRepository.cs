@@ -2,71 +2,96 @@ using Microsoft.EntityFrameworkCore;
 using SocialNetwork.WebAPI.Data;
 using SocialNetwork.WebAPI.Entities;
 using SocialNetwork.WebAPI.Interfaces.Repositories;
+using SocialNetwork.WebAPI.Models.Comment;
+using SocialNetwork.WebAPI.Models.User;
 
 namespace SocialNetwork.WebAPI.Repositories;
 
 public class CommentRepository(SocialNetworkDbContext context) : ICommentRepository
 {
 
-    public async Task AddCommentAsync(Comment comment)
+    public void AddComment(Comment comment)
     {
-        await context.Comments.AddAsync(comment);
-        
-        await context.SaveChangesAsync();
+        context.Comments.Add(comment);
     }
 
-    public async Task<Comment?> GetCommentAsync(Guid postId, Guid commentId)
+    public async Task<Comment?> GetCommentAsync(Guid commentId, CancellationToken cancellationToken = default)
     {
-        var comment = await context.Comments
-            .Where(c => c.Id == commentId && c.PostId == postId)
-            .SingleOrDefaultAsync();
-        
-        return comment;
+        return await context.Comments.FindAsync([commentId], cancellationToken);
     }
 
-    public async Task<IEnumerable<Comment>> GetCommentsAsync(
-        Guid postId,
-        DateTime timestamp,
-        Guid commentId,
-        int limit)
+    public async Task<CommentResponse?> GetCommentModelAsync(Guid commentId, CancellationToken cancellationToken = default)
     {
-        var comments = await context.Comments
+        return await context.Comments
+            .Where(c => c.Id == commentId)
+            .Select(c => new CommentResponse()
+            {
+                Id = c.Id,
+                Author = new Author()
+                {
+                    Id = c.Author.Id,
+                    Username = c.Author.Username,
+                    FullName = c.Author.FullName,
+                    ProfileImageUrl = c.Author.ProfileImageUrl,
+                },
+                Content = c.Content,
+                CreatedAt = c.CreatedAt,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<CommentResponse>> GetCommentsAsync(Guid postId,
+        DateTimeOffset? timestamp,
+        Guid? commentId,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        limit = Math.Clamp(limit, 0, 100);
+        
+        var query = context.Comments
             .Where(c => c.PostId == postId)
             .OrderByDescending(c => c.CreatedAt)
             .ThenBy(c => c.Id)
-            .Where(c => c.CreatedAt < timestamp ||
-                        (c.CreatedAt == timestamp && c.Id > commentId))
+            .AsQueryable();
+
+        if (timestamp.HasValue && commentId.HasValue)
+        {
+            query = query.Where(c => c.CreatedAt < timestamp.Value
+                || (c.CreatedAt == timestamp.Value && c.Id > commentId.Value));
+        }
+        
+        return await query
             .Take(limit)
-            .Include(c => c.User)
-            .ToListAsync();
-        
-        return comments;
+            .Select(c => new CommentResponse()
+            {
+                Id = c.Id,
+                Author = new Author()
+                {
+                    Id = c.Author.Id,
+                    Username = c.Author.Username,
+                    FullName = c.Author.FullName,
+                    ProfileImageUrl = c.Author.ProfileImageUrl,
+                },
+                Content = c.Content,
+                CreatedAt = c.CreatedAt,
+            })
+            .ToListAsync(cancellationToken);
     }
 
-    public async Task SaveChangesAsync()
+    public void DeleteComment(Comment comment)
     {
-        await context.SaveChangesAsync();
+        context.Comments.Remove(comment);
     }
 
-    public async Task<bool> DeleteCommentAsync(Guid postId, Guid commentId)
+    public async Task DeleteUserCommentsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var deletedRows = await context.Comments
-            .Where(c => c.Id == commentId && c.PostId == postId)
-            .ExecuteDeleteAsync();
-        
-        return deletedRows > 0;
+        await context.Comments
+            .Where(c => c.UserId == userId)
+            .ExecuteDeleteAsync(cancellationToken);
     }
 
-    public async Task<Dictionary<Guid, int>> GetCommentsCountByPostIdsAsync(IEnumerable<Guid> postIds)
+    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        var postIdList = postIds.ToList();
-        
-        var commentCounts = await context.Comments
-            .Where(c => postIdList.Contains(c.PostId))
-            .GroupBy(c => c.PostId)
-            .Select(g => new { PostId = g.Key, Count = g.Count() })
-            .ToListAsync();
-        
-        return commentCounts.ToDictionary(x => x.PostId, x => x.Count);
+        await context.SaveChangesAsync(cancellationToken);
     }
 }
