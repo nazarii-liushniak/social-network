@@ -1,17 +1,20 @@
 using SocialNetwork.WebAPI.Entities;
+using SocialNetwork.WebAPI.Models.Comment;
 
 namespace SocialNetwork.WebAPI.Interfaces.Repositories;
 
 public interface ICommentRepository
 {
-    Task AddCommentAsync(Comment comment);
-    Task<Comment?> GetCommentAsync(Guid postId, Guid commentId);
-    Task<IEnumerable<Comment>> GetCommentsAsync(
+    void AddComment(Comment comment);
+    Task<Comment?> GetCommentAsync(Guid commentId, CancellationToken cancellationToken = default);
+    Task<CommentResponse?> GetCommentModelAsync(Guid commentId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<CommentResponse>> GetCommentsAsync(
         Guid postId,
-        DateTime timestamp,
-        Guid commentId,
-        int limit);
-    Task SaveChangesAsync();
-    Task<bool> DeleteCommentAsync(Guid postId, Guid commentId);
-    Task<Dictionary<Guid, int>> GetCommentsCountByPostIdsAsync(IEnumerable<Guid> postIds);
+        DateTimeOffset? timestamp,
+        Guid? commentId,
+        int limit,
+        CancellationToken cancellationToken = default);
+    void DeleteComment(Comment comment);
+    Task DeleteUserCommentsAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

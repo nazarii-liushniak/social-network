@@ -7,58 +7,33 @@ namespace SocialNetwork.WebAPI.Repositories;
 
 public class FollowRepository(SocialNetworkDbContext context) : IFollowRepository
 {
-    public async Task<bool> ExistsFollowAsync(Guid followerId, Guid followeeId)
+    public void AddFollow(Follow follow)
     {
-        var existsFollow = await context.Follows
-            .AnyAsync(f => f.FollowerId == followerId
-                           && f.FolloweeId == followeeId);
-        
-        return existsFollow;
+        context.Follows.Add(follow);
     }
 
-    public async Task AddFollowAsync(Follow follow)
+    public async Task<Follow?> GetFollowAsync(
+        Guid followerId,
+        Guid followeeId,
+        CancellationToken cancellationToken = default)
     {
-        await context.Follows.AddAsync(follow);
-        
-        await context.SaveChangesAsync();
+        return await context.Follows.FindAsync([followerId, followeeId], cancellationToken);
     }
 
-    public async Task<IEnumerable<Follow>> GetFollowingsByUser(Guid userId)
+    public void DeleteFollow(Follow follow)
     {
-        var users = await context.Follows
-            .Where(f => f.FollowerId == userId)
-            .Include(f => f.Followee)
-            .ToListAsync();
-
-        return users;
+        context.Follows.Remove(follow);
     }
 
-    public async Task<bool> DeleteFollowAsync(Guid followerId, Guid followeeId)
+    public async Task DeleteUserFollowsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var deletedRows = await context.Follows
-            .Where(f => f.FollowerId == followerId && f.FolloweeId == followeeId)
-            .ExecuteDeleteAsync();
-
-        await context.SaveChangesAsync();
-
-        return deletedRows > 0;
+        await context.Follows
+            .Where(f => f.FolloweeId == userId)
+            .ExecuteDeleteAsync(cancellationToken);
     }
 
-    public async Task<int> GetFollowersCountAsync(Guid userId)
+    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        return await context.Follows
-            .CountAsync(f => f.FolloweeId == userId);
-    }
-    
-    public async Task<int> GetFollowingCountAsync(Guid userId)
-    {
-        return await context.Follows
-            .CountAsync(f => f.FollowerId == userId);
-    }
-
-    public async Task<bool> IsFollowedByUserAsync(Guid followerId, Guid followeeId)
-    {
-        return await context.Follows
-            .AnyAsync(f => f.FollowerId == followerId && f.FolloweeId == followeeId);
+        await context.SaveChangesAsync(cancellationToken);
     }
 }

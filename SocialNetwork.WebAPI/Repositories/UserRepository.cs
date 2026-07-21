@@ -2,106 +2,198 @@ using Microsoft.EntityFrameworkCore;
 using SocialNetwork.WebAPI.Data;
 using SocialNetwork.WebAPI.Entities;
 using SocialNetwork.WebAPI.Interfaces.Repositories;
+using SocialNetwork.WebAPI.Models.User;
 
 namespace SocialNetwork.WebAPI.Repositories;
 
 public class UserRepository(SocialNetworkDbContext context) : IUserRepository
 {
-    public async Task<bool> ExistsUserAsync(Guid userId)
+    public async Task<bool> ExistsUserAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await context.Users
-            .AnyAsync(u => u.Id == userId);
+            .AnyAsync(
+                u => u.Id == userId,
+                cancellationToken);
+    }
+
+    public async Task<bool> ExistsUserWithUsernameAsync(string username, CancellationToken cancellationToken = default)
+    {
+        return await context.Users
+            .AnyAsync(
+                u => u.Username == username,
+                cancellationToken);
     }
     
-    public async Task<User> AddUserAsync(User user)
+    public async Task<bool> ExistsUserWithEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        await context.Users.AddAsync(user);
-        
-        await context.SaveChangesAsync();
-        
-        return user;
+        return await context.Users
+            .AnyAsync(
+                u => u.Username == email,
+                cancellationToken);
+    }
+    
+    public void AddUser(User user)
+    {
+        context.Users.Add(user);
     }
 
-    public async Task<User?> GetUserAsync(Guid userId)
+    public async Task<User?> GetUserAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var user =  await context.Users.FindAsync(userId);
-        
-        return user;
+        return await context.Users.FindAsync([userId], cancellationToken);
     }
 
-    public async Task<User?> GetUserWithPostsAsync(Guid userId, int limit)
+    public async Task<User?> GetUserByUsernameAsync(string username, CancellationToken cancellationToken = default)
     {
-        var user = await context.Users
-            .Include(u => u.Posts
-                .OrderByDescending(p => p.CreatedAt)
-                .Take(limit))
-            .FirstOrDefaultAsync(u => u.Id == userId);
-
-        return user;
+        return await context.Users
+            .Where(u => u.Username == username)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<IEnumerable<User>> GetUsersAsync()
+    public async Task<UserResponse?> GetUserModelAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var users = await context.Users.ToListAsync();
-        
-        return users;
+        return await context.Users
+            .Where(u => u.Id == userId)
+            .Select(u => new UserResponse()
+            {
+                Id = u.Id,
+                Username = u.Username,
+                Email = u.Email,
+                FullName = u.FullName,
+                Description = u.Description,
+                ProfileImageUrl = u.ProfileImageUrl,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<IEnumerable<Follow>> GetFollowersAsync(
+    public async Task<ProfileResponse?> GetUserProfileAsync(
+        Guid? currentUserId,
         Guid userId,
-        DateTime timestamp,
-        Guid followerId,
-        Guid followeeId,
-        int limit)
+        CancellationToken cancellationToken = default)
     {
-        var users = await context.Users
+        return await context.Users
             .Where(u => u.Id == userId)
-            .SelectMany(u => u.Followers)
-            .OrderByDescending(f => f.CreatedAt)
-            .ThenBy(f => new { f.FollowerId, f.FolloweeId })
-            .Where(f => f.CreatedAt > timestamp || 
-                        (f.CreatedAt == timestamp && f.FollowerId < followerId) ||
-                        (f.CreatedAt == timestamp && f.FollowerId == followerId && f.FolloweeId > followeeId))
+            .Select(u => new ProfileResponse()
+            {
+                Id = u.Id,
+                Username = u.Username,
+                FullName = u.FullName,
+                Description = u.Description,
+                ProfileImageUrl = u.ProfileImageUrl,
+                IsFollowedByMe = currentUserId.HasValue 
+                    ? u.Followers.Any(f => f.FollowerId == currentUserId.Value) 
+                    : null,
+                FollowersCount = u.Followers.Count,
+                FolloweesCount = u.Followees.Count,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ShortProfileResponse>> GetUsersAsync(DateTimeOffset? timestamp,
+        Guid? userId,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        limit = Math.Clamp(limit, 0, 100);
+
+        var query = context.Users.AsQueryable();
+
+        if (timestamp.HasValue && userId.HasValue)
+        {
+            query = query.Where(u => u.CreatedAt < timestamp.Value
+                || (u.CreatedAt == timestamp.Value && u.Id > userId.Value));
+        }
+
+        return await query
+            .OrderByDescending(u => u.CreatedAt)
+            .ThenBy(u => u.Id)
             .Take(limit)
-            .Include(f => f.Follower)
-            .ToListAsync();
-        
-        return users;
+            .Select(u => new ShortProfileResponse()
+            {
+                Id = u.Id,
+                Username = u.Username,
+                FullName = u.FullName,
+                ProfileImageUrl = u.ProfileImageUrl,
+                Timestamp = u.CreatedAt,
+            }
+            )
+            .ToListAsync(cancellationToken);
     }
 
-    public async Task<IEnumerable<Follow>> GetFollowingsAsync(
-        Guid userId,
-        DateTime timestamp,
-        Guid followerId,
-        Guid followeeId,
-        int limit)
+    public async Task<IReadOnlyList<ShortProfileResponse>> GetFollowersAsync(Guid userId,
+        DateTimeOffset? timestamp,
+        Guid? followerId,
+        int limit,
+        CancellationToken cancellationToken = default)
     {
-        var users = await context.Users
+        limit = Math.Clamp(limit, 0, 100);
+
+        var query = context.Users
             .Where(u => u.Id == userId)
-            .SelectMany(u => u.Followees)
+            .SelectMany(u => u.Followers);
+        
+        if (timestamp.HasValue && followerId.HasValue)
+        {
+            query = query.Where(f => f.CreatedAt < timestamp.Value
+                || (f.CreatedAt == timestamp.Value && f.FollowerId > followerId.Value));
+        }
+        
+        return await query
             .OrderByDescending(f => f.CreatedAt)
-            .ThenBy(f => new { f.FollowerId, f.FolloweeId })
-            .Where(f => f.CreatedAt > timestamp || 
-                        (f.CreatedAt == timestamp && f.FollowerId < followerId) ||
-                        (f.CreatedAt == timestamp && f.FollowerId == followerId && f.FolloweeId > followeeId))
+            .ThenBy(f => f.FollowerId)
             .Take(limit)
-            .Include(f => f.Followee)
-            .ToListAsync();
-        
-        return users;
+            .Select(f => new ShortProfileResponse()
+            {
+                Id = f.Follower.Id,
+                Username = f.Follower.Username,
+                FullName = f.Follower.FullName,
+                ProfileImageUrl = f.Follower.ProfileImageUrl,
+                Timestamp = f.CreatedAt,
+            }
+            )
+            .ToListAsync(cancellationToken);
     }
 
-    public async Task SaveChangesAsync()
+    public async Task<IReadOnlyList<ShortProfileResponse>> GetFolloweesAsync(Guid userId,
+        DateTimeOffset? timestamp,
+        Guid? followeeId,
+        int limit,
+        CancellationToken cancellationToken = default)
     {
-        await context.SaveChangesAsync();
-    }
+        limit = Math.Clamp(limit, 0, 100);
 
-    public async Task<bool> DeleteUserAsync(Guid userId)
-    {
-        var deletedRows = await context.Users
+        var query = context.Users
             .Where(u => u.Id == userId)
-            .ExecuteDeleteAsync();
+            .SelectMany(u => u.Followees);
         
-        return deletedRows > 0;
+        if (timestamp.HasValue && followeeId.HasValue)
+        {
+            query = query.Where(f => f.CreatedAt < timestamp.Value
+                || (f.CreatedAt == timestamp.Value && f.FolloweeId > followeeId.Value));
+        }
+        
+        return await query
+            .OrderByDescending(f => f.CreatedAt)
+            .ThenBy(f => f.FolloweeId)
+            .Take(limit)
+            .Select(f => new ShortProfileResponse()
+            {
+                Id = f.Followee.Id,
+                Username = f.Followee.Username,
+                FullName = f.Followee.FullName,
+                ProfileImageUrl = f.Followee.ProfileImageUrl,
+                Timestamp = f.CreatedAt
+            }
+            )
+            .ToListAsync(cancellationToken);
+    }
+
+    public void DeleteUser(User user)
+    {
+        context.Users.Remove(user);
+    }
+
+    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        await context.SaveChangesAsync(cancellationToken);
     }
 }

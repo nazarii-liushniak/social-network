@@ -1,26 +1,38 @@
 using SocialNetwork.WebAPI.Entities;
+using SocialNetwork.WebAPI.Models.User;
 
 namespace SocialNetwork.WebAPI.Interfaces.Repositories;
 
 public interface IUserRepository
 {
-    Task<bool> ExistsUserAsync(Guid userId);
-    Task<User> AddUserAsync(User user);
-    Task<User?> GetUserAsync(Guid userId);
-    Task<User?> GetUserWithPostsAsync(Guid userId, int limit);
-    Task<IEnumerable<User>> GetUsersAsync();
-    Task<IEnumerable<Follow>> GetFollowersAsync(
+    Task<bool> ExistsUserAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<bool> ExistsUserWithUsernameAsync(string username, CancellationToken cancellationToken = default);
+    Task<bool> ExistsUserWithEmailAsync(string email, CancellationToken cancellationToken = default);
+    void AddUser(User user);
+    Task<User?> GetUserAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<User?> GetUserByUsernameAsync(string username, CancellationToken cancellationToken = default);
+    Task<UserResponse?> GetUserModelAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<ProfileResponse?> GetUserProfileAsync(
+        Guid? currentUserId,
         Guid userId,
-        DateTime timestamp,
-        Guid followerId,
-        Guid followeeId,
-        int limit);
-    Task<IEnumerable<Follow>> GetFollowingsAsync(
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ShortProfileResponse>> GetUsersAsync(
+        DateTimeOffset? timestamp,
+        Guid? userId,
+        int limit,
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ShortProfileResponse>> GetFollowersAsync(
         Guid userId,
-        DateTime timestamp,
-        Guid followerId,
-        Guid followeeId,
-        int limit);
-    Task SaveChangesAsync();
-    Task<bool> DeleteUserAsync(Guid userId);
+        DateTimeOffset? timestamp,
+        Guid? followerId,
+        int limit,
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ShortProfileResponse>> GetFolloweesAsync(
+        Guid userId,
+        DateTimeOffset? timestamp,
+        Guid? followeeId,
+        int limit,
+        CancellationToken cancellationToken = default);
+    void DeleteUser(User user);
+    Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }
