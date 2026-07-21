@@ -1,18 +1,23 @@
-using Microsoft.AspNetCore.JsonPatch;
+using FluentResults;
+using SocialNetwork.WebAPI.Models;
 using SocialNetwork.WebAPI.Models.Comment;
 
 namespace SocialNetwork.WebAPI.Interfaces.Services;
 
 public interface ICommentService
 {
-    public Task<Comment?> CreateCommentAsync(
-        Guid userId,
+    Task<Result<CommentResponse>> CreateCommentAsync(
         Guid postId,
-        CreateOrUpdateComment comment);
-    public Task<Comments?> GetCommentsAsync(Guid postId, string? cursor, int limit);
-    public Task<bool> UpdateCommentAsync(
+        CreateOrUpdateCommentRequest createOrUpdateCommentRequest,
+        CancellationToken cancellationToken = default);
+    Task<Result<PagedResponse<CommentResponse>>> GetCommentsAsync(
         Guid postId,
+        string? cursor,
+        int limit,
+        CancellationToken cancellationToken = default);
+    Task<Result<CommentResponse>> UpdateCommentAsync(
         Guid commentId,
-        JsonPatchDocument<CreateOrUpdateComment> commentPatch);
-    public Task<bool> DeleteCommentAsync(Guid postId, Guid commentId);
+        CreateOrUpdateCommentRequest createOrUpdateCommentRequest,
+        CancellationToken cancellationToken = default);
+    Task<Result> DeleteCommentAsync(Guid commentId, CancellationToken cancellationToken = default);
 }

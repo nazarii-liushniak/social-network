@@ -1,12 +1,13 @@
+using System.Globalization;
 using System.Text;
 
 namespace SocialNetwork.WebAPI.Helpers;
 
 public static class CursorHelper
 {
-    public static string GenerateCursor(DateTime timestamp, Guid id)
+    public static string GenerateCursor(DateTimeOffset timestamp, Guid id)
     {
-        var timestampString = timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fff");
+        var timestampString = timestamp.ToString("O");
         var idString = id.ToString("N");
         
         var cursorString = new StringBuilder(timestampString)
@@ -19,53 +20,40 @@ public static class CursorHelper
         return Convert.ToBase64String(cursorBytes);
     }
     
-    public static string GenerateCursor(DateTime timestamp, Guid followerId, Guid followeeId)
+    public static bool TryParseCursor(string? cursor, out DateTimeOffset? timestamp, out Guid? id)
     {
-        var timestampString = timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fff");
-        var followerIdString = followerId.ToString("N");
-        var followeeIdString = followeeId.ToString("N");
-        
-        var cursorString = new StringBuilder(timestampString)
-            .Append('|')
-            .Append(followerIdString)
-            .Append('|')
-            .Append(followeeIdString)
-            .ToString();
-        
-        var cursorBytes = Encoding.UTF8.GetBytes(cursorString);
+        timestamp = null;
+        id = null;
 
-        return Convert.ToBase64String(cursorBytes);
-    }
-    
-    public static (DateTime, Guid) ParseCursor(string cursor)
-    {
-        var cursorBytes = Convert.FromBase64String(cursor);
-        var cursorString = Encoding.UTF8.GetString(cursorBytes);
-        var splitCursorString = cursorString.Split('|');
+        if (string.IsNullOrWhiteSpace(cursor))
+            return true;
 
-        var timestampString = splitCursorString[0];
-        var idString = splitCursorString[1];
-        
-        var timestamp = DateTime.Parse(timestampString);
-        var id = Guid.Parse(idString);
-        
-        return (timestamp, id);
-    }
-    
-    public static (DateTime, Guid, Guid) ParseCursorForFollows(string cursor)
-    {
-        var cursorBytes = Convert.FromBase64String(cursor);
-        var cursorString = Encoding.UTF8.GetString(cursorBytes);
-        var splitCursorString = cursorString.Split('|');
+        try
+        {
+            var cursorBytes = Convert.FromBase64String(cursor);
+            var cursorString = Encoding.UTF8.GetString(cursorBytes);
 
-        var timestampString = splitCursorString[0];
-        var followerIdString = splitCursorString[1];
-        var followeeIdString = splitCursorString[2];
-        
-        var timestamp = DateTime.Parse(timestampString);
-        var followerId = Guid.Parse(followerIdString);
-        var followeeId = Guid.Parse(followeeIdString);
-        
-        return (timestamp, followerId, followeeId);
+            var splitCursorString = cursorString.Split('|');
+            if (splitCursorString.Length != 2)
+                return false;
+
+            var timestampString = splitCursorString[0];
+            var idString = splitCursorString[1];
+            
+            var isTimestampParsed = DateTimeOffset.TryParse(timestampString, CultureInfo.InvariantCulture, out var parsedTimestamp);
+            var isIdParsed = Guid.TryParse(idString, CultureInfo.InvariantCulture, out var parsedId);
+
+            if (!isTimestampParsed || !isIdParsed)
+                return false;
+            
+            timestamp = parsedTimestamp;
+            id = parsedId;
+            
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
     }
 }

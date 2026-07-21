@@ -1,4 +1,5 @@
-using Microsoft.AspNetCore.JsonPatch;
+using FluentResults;
+using SocialNetwork.WebAPI.Models;
 using SocialNetwork.WebAPI.Models.Post;
 using SocialNetwork.WebAPI.Models.User;
 
@@ -6,17 +7,31 @@ namespace SocialNetwork.WebAPI.Interfaces.Services;
 
 public interface IPostService
 {
-    public Task<Post?> PostAsync(Guid userId, CreateOrUpdatePost post);
-    public Task<Feed?> GetFeedAsync(Guid userId, string? cursor, int limit);
-    public Task<PostWithAuthorAndComments?> GetPostAsync(
-        Guid? currentUserId,
+    Task<Result<PostResponse>> CreatePostAsync(
+        CreateOrUpdatePostRequest createOrUpdatePostRequest,
+        CancellationToken cancellationToken = default);
+    Task<Result<PostWithAuthorResponse>> GetPostAsync(
         Guid postId,
-        int commentsLimit);
-    public Task<bool> UpdatePostAsync(
+        CancellationToken cancellationToken = default);
+    Task<Result<PagedResponse<PostWithAuthorResponse>>> GetFeedAsync(
+        string? cursor,
+        int limit,
+        CancellationToken cancellationToken = default);
+    Task<Result<PagedResponse<PostResponse>>> GetPostsAsync(
+        Guid userId,
+        string? cursor,
+        int limit,
+        CancellationToken cancellationToken = default);
+    Task<Result<PostResponse>> UpdatePostAsync(
         Guid postId,
-        JsonPatchDocument<CreateOrUpdatePost> postPatch);
-    public Task<bool> DeletePostAsync(Guid postId);
-    public Task<bool> LikePostAsync(Guid userId, Guid postId);
-    public Task<bool> UnlikePostAsync(Guid userId, Guid postId);
-    public Task<ShortProfiles?> GetUsersLikedPostAsync(Guid postId, string? cursor, int limit);
+        CreateOrUpdatePostRequest createOrUpdatePostRequest,
+        CancellationToken cancellationToken = default);
+    Task<Result> DeletePostAsync(Guid postId, CancellationToken cancellationToken = default);
+    Task<Result> LikePostAsync(Guid postId, CancellationToken cancellationToken = default);
+    Task<Result> UnlikePostAsync(Guid postId, CancellationToken cancellationToken = default);
+    Task<Result<PagedResponse<ShortProfileResponse>>> GetUsersLikedPostAsync(
+        Guid postId,
+        string? cursor,
+        int limit,
+        CancellationToken cancellationToken = default);
 }

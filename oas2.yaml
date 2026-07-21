@@ -1,0 +1,795 @@
+openapi: 3.0.3
+info:
+  title: SocialNetwork WebAPI
+  version: 1.0.0
+servers:
+  - url: /
+security:
+  - BearerAuth: []
+paths:
+  /api/Chats:
+    get:
+      tags: [Chats]
+      summary: Get Chats
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Chat'
+  /api/Chats/{userId}:
+    get:
+      tags: [Chats]
+      summary: Get Messages
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Messages'
+        '404':
+          description: User not found
+
+  /api/Posts:
+    post:
+      tags: [Posts]
+      summary: Create Post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrUpdatePost'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+    get:
+      tags: [Posts]
+      summary: Get Feed
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Feed'
+
+  /api/Posts/{postId}:
+    get:
+      tags: [Posts]
+      summary: Get Post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: commentsLimit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostWithAuthorAndComments'
+        '404':
+          description: Not found
+    patch:
+      tags: [Posts]
+      summary: Patch Post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrUpdatePost'
+      responses:
+        '204':
+          description: Success
+        '404':
+          description: Not found
+    delete:
+      tags: [Posts]
+      summary: Delete Post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Success
+        '404':
+          description: Not found
+
+  /api/Posts/{postId}/likes:
+    get:
+      tags: [Posts]
+      summary: Get Likes
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShortProfiles'
+        '404':
+          description: Not found
+    post:
+      tags: [Posts]
+      summary: Like Post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Success
+        '404':
+          description: Not found
+    delete:
+      tags: [Posts]
+      summary: Unlike Post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Success
+        '404':
+          description: Not found
+
+  /api/Posts/{postId}/comments:
+    get:
+      tags: [Posts]
+      summary: Get Comments
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comments'
+        '404':
+          description: Not found
+    post:
+      tags: [Posts]
+      summary: Create Comment
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrUpdateComment'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        '404':
+          description: Not found
+
+  /api/Posts/{postId}/comments/{commentId}:
+    patch:
+      tags: [Posts]
+      summary: Update Comment
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrUpdateComment'
+      responses:
+        '204':
+          description: Success
+        '404':
+          description: Not found
+    delete:
+      tags: [Posts]
+      summary: Delete Comment
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Success
+        '404':
+          description: Not found
+
+  /api/Users/{userId}:
+    get:
+      tags: [Users]
+      summary: Get User
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: postsLimit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '404':
+          description: Not found
+
+  /api/Users/me:
+    get:
+      tags: [Users]
+      summary: Get Me
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfo'
+    patch:
+      tags: [Users]
+      summary: Patch Me
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserInfo'
+      responses:
+        '204':
+          description: Success
+    delete:
+      tags: [Users]
+      summary: Delete Me
+      responses:
+        '204':
+          description: Success
+
+  /api/Users/{userId}/posts:
+    get:
+      tags: [Users]
+      summary: Get Posts
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Posts'
+        '404':
+          description: Not found
+
+  /api/Users/{userId}/followers:
+    get:
+      tags: [Users]
+      summary: Get Followers
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShortProfiles'
+        '404':
+          description: Not found
+    post:
+      tags: [Users]
+      summary: Follow
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Success
+        '404':
+          description: Not found
+    delete:
+      tags: [Users]
+      summary: Unfollow
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Success
+        '404':
+          description: Not found
+
+  /api/Users/{userId}/following:
+    get:
+      tags: [Users]
+      summary: Get Following
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShortProfiles'
+        '404':
+          description: Not found
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Profile:
+      type: object
+      required: [id, username, followersCount, followingCount, postsPreview]
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        fullName:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        profileImageUrl:
+          type: string
+          format: uri
+          nullable: true
+        isFollowedByMe:
+          type: boolean
+          nullable: true
+        followersCount:
+          type: integer
+        followingCount:
+          type: integer
+        postsPreview:
+          $ref: '#/components/schemas/Posts'
+
+    ShortProfile:
+      type: object
+      required: [id, username]
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        fullName:
+          type: string
+          nullable: true
+        profileImageUrl:
+          type: string
+          format: uri
+          nullable: true
+
+    ShortProfiles:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ShortProfile'
+        nextCursor:
+          type: string
+          nullable: true
+
+    UpdateUserInfo:
+      type: object
+      required: [username]
+      properties:
+        username:
+          type: string
+        fullName:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        profileImageUrl:
+          type: string
+          format: uri
+          nullable: true
+
+    UserInfo:
+      type: object
+      required: [id, username, email]
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        email:
+          type: string
+        fullName:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        profileImageUrl:
+          type: string
+          format: uri
+          nullable: true
+
+    CreateOrUpdatePost:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+        imageUrl:
+          type: string
+          format: uri
+          nullable: true
+
+    Feed:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PostWithAuthor'
+        nextCursor:
+          type: string
+          nullable: true
+
+    Post:
+      type: object
+      required: [id, content, timestamp]
+      properties:
+        id:
+          type: string
+          format: uuid
+        content:
+          type: string
+        imageUrl:
+          type: string
+          format: uri
+          nullable: true
+        commentsCount:
+          type: integer
+          nullable: true
+        likesCount:
+          type: integer
+          nullable: true
+        isLikedByMe:
+          type: boolean
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+
+    PostWithAuthor:
+      type: object
+      required: [id, author, content, commentsCount, likesCount, timestamp]
+      properties:
+        id:
+          type: string
+          format: uuid
+        author:
+          $ref: '#/components/schemas/ShortProfile'
+        content:
+          type: string
+        imageUrl:
+          type: string
+          format: uri
+          nullable: true
+        commentsCount:
+          type: integer
+        likesCount:
+          type: integer
+        isLikedByMe:
+          type: boolean
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+
+    PostWithAuthorAndComments:
+      type: object
+      required: [id, author, content, commentsCount, commentsPreview, likesCount, timestamp]
+      properties:
+        id:
+          type: string
+          format: uuid
+        author:
+          $ref: '#/components/schemas/ShortProfile'
+        content:
+          type: string
+        imageUrl:
+          type: string
+          format: uri
+          nullable: true
+        commentsCount:
+          type: integer
+        commentsPreview:
+          $ref: '#/components/schemas/Comments'
+        likesCount:
+          type: integer
+        isLikedByMe:
+          type: boolean
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+
+    Posts:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Post'
+        nextCursor:
+          type: string
+          nullable: true
+
+    Comment:
+      type: object
+      required: [id, author, content, timestamp]
+      properties:
+        id:
+          type: string
+          format: uuid
+        author:
+          $ref: '#/components/schemas/ShortProfile'
+        content:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    Comments:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+        nextCursor:
+          type: string
+          nullable: true
+
+    CreateOrUpdateComment:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+
+    Chat:
+      type: object
+      required: [otherUser, lastMessageContent, lastMessageTimestamp]
+      properties:
+        otherUser:
+          $ref: '#/components/schemas/ShortProfile'
+        lastMessageContent:
+          type: string
+        lastMessageTimestamp:
+          type: string
+          format: date-time
+
+    CreateMessage:
+      type: object
+      required: [receiverId, content]
+      properties:
+        receiverId:
+          type: string
+          format: uuid
+        content:
+          type: string
+
+    Message:
+      type: object
+      required: [id, direction, content, timestamp]
+      properties:
+        id:
+          type: string
+          format: uuid
+        direction:
+          type: string
+          enum: [Incoming, Outgoing]
+        content:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    Messages:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+        nextCursor:
+          type: string
+          nullable: true

@@ -1,88 +1,120 @@
+using FluentResults;
+using Microsoft.AspNetCore.SignalR;
+using SocialNetwork.WebAPI.Entities;
+using SocialNetwork.WebAPI.Errors;
 using SocialNetwork.WebAPI.Helpers;
+using SocialNetwork.WebAPI.Hubs;
+using SocialNetwork.WebAPI.Interfaces.Contexts;
+using SocialNetwork.WebAPI.Interfaces.Hubs;
 using SocialNetwork.WebAPI.Interfaces.Repositories;
 using SocialNetwork.WebAPI.Interfaces.Services;
+using SocialNetwork.WebAPI.Models;
 using SocialNetwork.WebAPI.Models.Message;
-using SocialNetwork.WebAPI.Models.User;
 
 namespace SocialNetwork.WebAPI.Services;
 
 public class ChatService(
+    TimeProvider timeProvider,
+    IUserContext userContext,
     IUserRepository userRepository,
-    IMessageRepository messageRepository
-) : IChatService
+    IMessageRepository messageRepository,
+    IHubContext<ChatHub, IChatClient> hubContext) : IChatService
 {
-    public async Task<IEnumerable<Chat>?> GetChatsAsync(Guid userId)
-    {
-        var userExists = await userRepository.ExistsUserAsync(userId);
-        if (!userExists)
-            return null;
-        
-        var chats = await messageRepository
-            .GetChatsAsync(userId);
-
-        var chatModels = chats.Select(c => new Chat
-        {
-            OtherUser = new ShortProfile
-            {
-                Id = c.OtherUser.Id,
-                Username = c.OtherUser.Username,
-                FullName = c.OtherUser.FullName,
-                ProfileImageUrl = c.OtherUser.ProfileImageUrl,
-            },
-            LastMessageContent = c.LastMessageContent,
-            LastMessageTimestamp = c.LastMessageTimestamp,
-        });
-        
-        return chatModels;
-    }
-
-    public async Task<Messages?> GetChatAsync(
-        Guid userId,
+    public async Task<Result<MessageResponse>> SendMessageAsync(
         Guid otherUserId,
-        string? cursor,
-        int limit)
+        CreateMessageRequest createMessageRequest,
+        CancellationToken cancellationToken = default)
     {
-        var otherUserExists = await userRepository.ExistsUserAsync(otherUserId);
-        if (!otherUserExists)
-            return null;
+        var existsUser = await userRepository.ExistsUserAsync(otherUserId, cancellationToken);
+        if (!existsUser)
+            return Result.Fail(new NotFoundError($"User with ID {otherUserId} not found"));
         
-        DateTime timestamp;
-        Guid messageId;
-
-        if (cursor == null)
-        {
-            timestamp = DateTime.UtcNow;
-            messageId = Guid.Empty;
-        }
-        else
-        {
-            (timestamp, messageId) = CursorHelper.ParseCursor(cursor);
-        }
-
-        var messageEntities = (await messageRepository
-            .GetMessagesAsync(userId, otherUserId, timestamp, messageId, limit))
-            .ToList();
-
-        var messagesModels = messageEntities.Select(m => new Message
-        {
-            Id = m.Id,
-            Direction = m.ReceiverId == userId
-                ? MessageDirection.Incoming
-                : MessageDirection.Outgoing,
-            Content = m.Content,
-            Timestamp = m.SentAt,
-        })
-        .ToList();
+        var currentUserId = userContext.UserId!.Value;
         
-        var lastMessage = messagesModels.LastOrDefault();
-        var messages = new Messages
+        var message = new Message()
         {
-            Items = messagesModels,
-            NextCursor = CursorHelper.GenerateCursor(
-                lastMessage?.Timestamp ?? DateTime.UtcNow,
-                lastMessage?.Id ?? Guid.Empty),
+            Id = Guid.Empty,
+            SenderId = currentUserId,
+            ReceiverId = otherUserId,
+            Content = createMessageRequest.Content,
+            SentAt = timeProvider.GetUtcNow(),
         };
 
-        return messages;
+        messageRepository.AddMessage(message);
+        await messageRepository.SaveChangesAsync(cancellationToken);
+        
+        var messageResponse = new MessageResponse()
+        {
+            Id = message.Id,
+            Direction = MessageDirection.Outgoing,
+            Content = message.Content,
+            SentAt = message.SentAt,
+        };
+        
+        await hubContext.Clients
+            .User(otherUserId.ToString())
+            .ReceiveMessage(messageResponse with { Direction = MessageDirection.Incoming });
+
+        return messageResponse;
+    }
+
+    public async Task<Result<PagedResponse<ChatResponse>>> GetChatsAsync(
+        string? cursor,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        if (limit is <= 0 or > 100)
+            return Result.Fail(new ValidationError("Limit must be greater than 0 and less than 100"));
+        
+        if (!CursorHelper.TryParseCursor(cursor, out var timestamp, out var userId))
+            return Result.Fail(new InvalidCursorError($"Cursor is invalid"));
+        
+        var currentUserId = userContext.UserId!.Value;
+
+        var chats = await messageRepository
+            .GetChatsAsync(currentUserId, timestamp, userId, limit + 1, cancellationToken);
+
+        string? nextCursor = null;
+        if (chats.Count > limit)
+        {
+            chats = chats.SkipLast(1).ToList();
+
+            var lastChat = chats.Last();
+            nextCursor = CursorHelper.GenerateCursor(lastChat.LastMessageTimestamp, lastChat.OtherUser.Id);
+        }
+        
+        return new PagedResponse<ChatResponse>(chats, nextCursor);
+    }
+
+    public async Task<Result<PagedResponse<MessageResponse>>> GetChatAsync(
+        Guid otherUserId,
+        string? cursor,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        if (limit is <= 0 or > 100)
+            return Result.Fail(new ValidationError("Limit must be greater than 0 and less than 100"));
+        
+        var existsOtherUser = await userRepository.ExistsUserAsync(otherUserId, cancellationToken);
+        if (!existsOtherUser)
+            return Result.Fail(new NotFoundError($"User with ID {otherUserId} not found"));
+        
+        if (!CursorHelper.TryParseCursor(cursor, out var timestamp, out var messageId))
+            return Result.Fail(new InvalidCursorError($"Cursor is invalid"));
+        
+        var currentUserId = userContext.UserId!.Value;
+
+        var messages = await messageRepository.GetMessagesAsync(currentUserId, otherUserId, timestamp, messageId, limit + 1, cancellationToken);
+        
+        string? nextCursor = null;
+        if (messages.Count > limit)
+        {
+            messages = messages.SkipLast(1).ToList();
+
+            var lastMessage = messages.Last();
+            nextCursor = CursorHelper.GenerateCursor(lastMessage.SentAt, lastMessage.Id);
+        }
+
+        return new PagedResponse<MessageResponse>(messages, nextCursor);
     }
 }

@@ -6,9 +6,9 @@ public class Post
     public Guid UserId { get; set; }
     public required string Content { get; set; }
     public string? ImageUrl { get; set; }
-    public DateTime CreatedAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
 
-    public User User { get; set; } = null!;
+    public User Author { get; set; } = null!;
     public ICollection<Comment> Comments { get; set; } = new HashSet<Comment>();
     public ICollection<Like> Likes { get; set; } = new HashSet<Like>();
 }

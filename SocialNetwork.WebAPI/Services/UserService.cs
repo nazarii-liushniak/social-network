@@ -1,92 +1,92 @@
-using Microsoft.AspNetCore.JsonPatch;
+using FluentResults;
 using SocialNetwork.WebAPI.Entities;
+using SocialNetwork.WebAPI.Errors;
 using SocialNetwork.WebAPI.Helpers;
+using SocialNetwork.WebAPI.Interfaces.Contexts;
 using SocialNetwork.WebAPI.Interfaces.Repositories;
 using SocialNetwork.WebAPI.Interfaces.Services;
-using SocialNetwork.WebAPI.Models.Post;
+using SocialNetwork.WebAPI.Models;
 using SocialNetwork.WebAPI.Models.User;
-using Post = SocialNetwork.WebAPI.Models.Post.Post;
 
 namespace SocialNetwork.WebAPI.Services;
 
 public class UserService(
+    TimeProvider timeProvider,
+    IUserContext userContext,
     IUserRepository userRepository,
-    IPostRepository postRepository,
     IFollowRepository followRepository,
-    ILikeRepository likeRepository,
-    ICommentRepository commentRepository) : IUserService
+    IMessageRepository messageRepository,
+    ICommentRepository commentRepository,
+    ILikeRepository likeRepository) : IUserService
 {
-    public async Task<Profile?> GetUserProfileAsync(
-        Guid? currentUserId,
-        Guid userId,
-        int limit)
+    public async Task<Result<PagedResponse<ShortProfileResponse>>> GetUsersAsync(
+        string? cursor,
+        int limit,
+        CancellationToken cancellationToken = default)
     {
-        var user = await userRepository.GetUserAsync(userId);
-        
-        if (user == null)
-            return null;
-        
-        var followersCount = await followRepository.GetFollowersCountAsync(userId);
-        var followingCount = await followRepository.GetFollowingCountAsync(userId);
-        
-        var isFollowedByMe = currentUserId == null
-            ? (bool?)null
-            : await followRepository.IsFollowedByUserAsync(currentUserId.Value, userId);
+        if (limit is <= 0 or > 100)
+            return Result.Fail(new ValidationError("Limit must be greater than 0 and less than 100"));
 
-        var postIds = user.Posts.Select(p => p.Id).ToList();
-        
-        var commentsCountMap = await commentRepository
-            .GetCommentsCountByPostIdsAsync(postIds);
-        var likesCountMap = await likeRepository
-            .GetLikesCountByPostIdsAsync(postIds);
-        var likedByMeSet = currentUserId == null
-            ? null
-            : await likeRepository.GetLikedPostsByUserAsync(currentUserId.Value, postIds);
+        if (!CursorHelper.TryParseCursor(cursor, out var timestamp, out var userId))
+            return Result.Fail(new InvalidCursorError($"Cursor is invalid"));
 
-        var posts = user.Posts
-            .Select(p => new Post
-            {
-                Id = p.Id,
-                Content = p.Content,
-                ImageUrl = p.ImageUrl,
-                CommentsCount = commentsCountMap.GetValueOrDefault(p.Id),
-                LikesCount = likesCountMap.GetValueOrDefault(p.Id),
-                IsLikedByMe = likedByMeSet?.Contains(p.Id),
-                Timestamp = p.CreatedAt,
-            })
-            .ToList();
+        var shortProfiles = await userRepository.GetUsersAsync(timestamp, userId, limit + 1, cancellationToken);
         
-        var lastPost = posts.LastOrDefault();
-        var profile = new Profile
+        string? nextCursor = null;
+        if (shortProfiles.Count > limit)
         {
-            Id = user.Id,
-            Username = user.Username,
-            FullName = user.FullName,
-            Description = user.Description,
-            ProfileImageUrl = user.ProfileImageUrl,
-            IsFollowedByMe = isFollowedByMe,
-            FollowersCount = followersCount,
-            FollowingCount = followingCount,
-            PostsPreview = new Posts
-            {
-                Items = posts,
-                NextCursor = CursorHelper.GenerateCursor(
-                    lastPost?.Timestamp ?? DateTime.Now,
-                    lastPost?.Id ?? Guid.Empty),
-            }
-        };
+            shortProfiles = shortProfiles.SkipLast(1).ToList();
 
-        return profile;
+            var lastShortProfile = shortProfiles.Last();
+            nextCursor = CursorHelper.GenerateCursor(lastShortProfile.Timestamp, lastShortProfile.Id);
+        }
+
+        return new PagedResponse<ShortProfileResponse>(shortProfiles, nextCursor);
     }
 
-    public async Task<UserInfo?> GetUserInfoAsync(Guid userId)
+    public async Task<Result<ProfileResponse>> GetUserProfileAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
     {
-        var user = await userRepository.GetUserAsync(userId);
+        var currentUserId = userContext.UserId;
+        var userProfile = await userRepository.GetUserProfileAsync(currentUserId, userId, cancellationToken);
         
-        if (user == null)
-            return null;
+        if (userProfile == null)
+            return Result.Fail(new NotFoundError($"User with ID {userId} not found"));
 
-        var userInfo = new UserInfo
+        return userProfile;
+    }
+
+    public async Task<Result<UserResponse>> GetUserModelAsync(CancellationToken cancellationToken = default)
+    {
+        var currentUserId = userContext.UserId!.Value;
+        
+        var userModel = await userRepository.GetUserModelAsync(currentUserId, cancellationToken);
+        
+        if (userModel == null)
+            return Result.Fail(new NotFoundError($"User with ID {currentUserId} not found"));
+        
+        return userModel;
+    }
+
+    public async Task<Result<UserResponse>> UpdateUserModelAsync(
+        UpdateUserModelRequest updateUserModelRequest,
+        CancellationToken cancellationToken = default)
+    {
+        var currentUserId = userContext.UserId!.Value;
+        var user = await userRepository.GetUserAsync(currentUserId, cancellationToken);
+
+        if (user == null)
+            return Result.Fail(new NotFoundError($"User with ID {currentUserId} not found"));
+
+        user.Username = updateUserModelRequest.Username;
+        user.FullName = updateUserModelRequest.FullName;
+        user.Description = updateUserModelRequest.Description;
+        user.ProfileImageUrl = updateUserModelRequest.ProfileImageUrl;
+
+        await userRepository.SaveChangesAsync(cancellationToken);
+        
+        var userInfo = new UserResponse()
         {
             Id = user.Id,
             Username = user.Username,
@@ -95,237 +95,137 @@ public class UserService(
             Description = user.Description,
             ProfileImageUrl = user.ProfileImageUrl,
         };
-        
+
         return userInfo;
     }
 
-    public async Task<bool> UpdateUserAsync(
-        Guid userId,
-        JsonPatchDocument<UpdateUserInfo> userInfoPatch)
+    public async Task<Result> DeleteUserAsync(CancellationToken cancellationToken = default)
     {
-        var user = await userRepository.GetUserAsync(userId);
+        var currentUserId = userContext.UserId!.Value;
+        var user = await userRepository.GetUserAsync(currentUserId, cancellationToken);
 
-        if (user == null)
-            return false;
+        await likeRepository.DeleteUserLikes(currentUserId, cancellationToken);
+        await commentRepository.DeleteUserCommentsAsync(currentUserId, cancellationToken);
+        await followRepository.DeleteUserFollowsAsync(currentUserId, cancellationToken);
+        await messageRepository.DeleteUserMessagesAsync(currentUserId, cancellationToken);
+        
+        userRepository.DeleteUser(user!);
+        await userRepository.SaveChangesAsync(cancellationToken);
 
-        var updateUserInfo = new UpdateUserInfo
-        {
-            Username = user.Username,
-            FullName = user.FullName,
-            Description = user.Description,
-            ProfileImageUrl = user.ProfileImageUrl,
-        };
-        
-        userInfoPatch.ApplyTo(updateUserInfo);
-
-        user.Username = updateUserInfo.Username;
-        user.FullName = updateUserInfo.FullName;
-        user.Description = updateUserInfo.Description;
-        user.ProfileImageUrl = updateUserInfo.ProfileImageUrl;
-        
-        await userRepository.SaveChangesAsync();
-        
-        return true;
+        return Result.Ok();
     }
 
-    public async Task<bool> DeleteUserAsync(Guid userId)
+    public async Task<Result> FollowAsync(Guid followeeId, CancellationToken cancellationToken = default)
     {
-        return await userRepository.DeleteUserAsync(userId);
-    }
+        var existsFollowee = await userRepository.ExistsUserAsync(followeeId, cancellationToken);
 
-    public async Task<Posts?> GetPostsAsync(
-        Guid currentUserId,
-        Guid userId,
-        string? cursor,
-        int limit = 20)
-    {
-        var userExists = await userRepository.ExistsUserAsync(userId);
-        if (!userExists)
-            return null;
+        if (!existsFollowee)
+            return Result.Fail(new NotFoundError($"Followee with ID {followeeId} not found"));
         
-        DateTime timestamp;
-        Guid postId;
+        var currentUserId = userContext.UserId!.Value;
 
-        if (cursor == null)
-        {
-            timestamp = DateTime.UtcNow;
-            postId = Guid.Empty;
-        }
-        else
-        {
-            (timestamp, postId) = CursorHelper.ParseCursor(cursor);
-        }
+        var follow = await followRepository.GetFollowAsync(currentUserId, followeeId, cancellationToken);
 
-        var postEntities = (await postRepository
-            .GetPostsAsync(userId, timestamp, postId, limit))
-            .ToList();
+        if (follow != null) return Result.Fail(
+            new AlreadyExistsError($"User with ID {currentUserId} already follows user with ID {followeeId}"));
         
-        var postIds = postEntities.Select(p => p.Id).ToList();
-        
-        var commentsCountMap = await commentRepository
-            .GetCommentsCountByPostIdsAsync(postIds);
-        var likesCountMap = await likeRepository
-            .GetLikesCountByPostIdsAsync(postIds);
-        var likedByMeSet = await likeRepository
-            .GetLikedPostsByUserAsync(currentUserId, postIds);
-
-        var postModels = postEntities
-            .Select(p => new Post
-            {
-                Id = p.Id,
-                Content = p.Content,
-                ImageUrl = p.ImageUrl,
-                CommentsCount = commentsCountMap.GetValueOrDefault(p.Id),
-                LikesCount = likesCountMap.GetValueOrDefault(p.Id),
-                IsLikedByMe = likedByMeSet.Contains(p.Id),
-                Timestamp = p.CreatedAt,
-            })
-            .ToList();
-
-        var lastPost = postModels.LastOrDefault();
-        var posts = new Posts
+        follow = new Follow
         {
-            Items = postModels,
-            NextCursor = CursorHelper.GenerateCursor(
-                lastPost?.Timestamp ?? DateTime.Now,
-                lastPost?.Id ?? Guid.Empty),
-        };
-
-        return posts;
-    }
-
-    public async Task<bool> FollowAsync(Guid followerId, Guid followeeId)
-    {
-        var followeeExists = await userRepository.ExistsUserAsync(followeeId);
-        if (!followeeExists)
-            return false;
-
-        var existsFollow = await followRepository
-            .ExistsFollowAsync(followerId, followeeId);
-
-        if (existsFollow)
-            return true;
-        
-        var follow = new Follow
-        {
-            FollowerId = followerId,
+            FollowerId = currentUserId,
             FolloweeId =  followeeId,
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = timeProvider.GetUtcNow(),
         };
 
-        await followRepository.AddFollowAsync(follow);
+        followRepository.AddFollow(follow);
+        await followRepository.SaveChangesAsync(cancellationToken);
 
-        return true;
+        return Result.Ok();
     }
 
-    public async Task<bool> UnfollowAsync(Guid followerId, Guid followeeId)
+    public async Task<Result> UnfollowAsync(Guid followeeId, CancellationToken cancellationToken = default)
     {
-        var followeeExists = await userRepository.ExistsUserAsync(followeeId);
-        if (!followeeExists)
-            return false;
+        var existsFollowee = await userRepository.ExistsUserAsync(followeeId, cancellationToken);
 
-        return await followRepository.DeleteFollowAsync(followerId, followeeId);
+        if (!existsFollowee)
+            return Result.Fail(new NotFoundError($"Followee with ID {followeeId} not found"));
+        
+        var currentUserId = userContext.UserId!.Value;
+        
+        var follow = await followRepository.GetFollowAsync(currentUserId, followeeId, cancellationToken);
+
+        if (follow == null)
+            return Result.Fail(new NotFoundError($"User with ID {currentUserId} already is not following user with ID {followeeId}"));
+
+        followRepository.DeleteFollow(follow);
+        await followRepository.SaveChangesAsync(cancellationToken);
+
+        return Result.Ok();
     }
     
-    public async Task<ShortProfiles?> GetFollowersAsync(
+    public async Task<Result<PagedResponse<ShortProfileResponse>>> GetFollowersAsync(
         Guid userId,
         string? cursor,
-        int limit)
+        int limit,
+        CancellationToken cancellationToken = default)
     {
-        var userExists = await userRepository.ExistsUserAsync(userId);
-        if (!userExists)
-            return null;
+        if (limit is <= 0 or > 100)
+            return Result.Fail(new ValidationError("Limit must be greater than 0 and less than 100"));
+
+        var existsUser = await userRepository.ExistsUserAsync(userId, cancellationToken);
+
+        if (!existsUser)
+            return Result.Fail(new NotFoundError($"User with ID {userId} not found"));
         
-        DateTime timestamp;
-        Guid followerId;
-        Guid followeeId;
+        if (!CursorHelper.TryParseCursor(cursor, out var timestamp, out var followerId))
+            return Result.Fail(new InvalidCursorError($"Cursor is invalid"));
 
-        if (cursor == null)
+        var shortProfiles = await userRepository
+            .GetFollowersAsync(userId, timestamp, followerId, limit + 1, cancellationToken);
+
+        string? nextCursor = null;
+        if (shortProfiles.Count > limit)
         {
-            timestamp = DateTime.UtcNow;
-            followerId = Guid.Empty;
-            followeeId = Guid.Empty;
+            shortProfiles = shortProfiles.SkipLast(1).ToList();
+
+            var lastShortProfile = shortProfiles.Last();
+            nextCursor = CursorHelper.GenerateCursor(lastShortProfile.Timestamp, lastShortProfile.Id);
         }
-        else
-        {
-            (timestamp, followerId, followeeId) = CursorHelper.ParseCursorForFollows(cursor);
-        }
 
-        var follows = (await userRepository
-                .GetFollowersAsync(userId, timestamp, followerId, followeeId, limit))
-            .ToList();
+        var pagedResult = new PagedResponse<ShortProfileResponse>(shortProfiles, nextCursor);
 
-        var shortProfileModels = follows
-            .Select(f => new ShortProfile
-            {
-                Id = f.Follower.Id,
-                Username = f.Follower.Username,
-                FullName = f.Follower.FullName,
-                ProfileImageUrl = f.Follower.ProfileImageUrl,
-            })
-            .ToList();
-
-        var lastFollow = follows.LastOrDefault();
-        var shortProfiles = new ShortProfiles
-        {
-            Items = shortProfileModels,
-            NextCursor = CursorHelper.GenerateCursor(
-                lastFollow?.CreatedAt ?? DateTime.UtcNow,
-                lastFollow?.FollowerId ?? Guid.Empty,
-                lastFollow?.FolloweeId ?? Guid.Empty),
-        };
-
-        return shortProfiles;
+        return pagedResult;
     }
     
-    public async Task<ShortProfiles?> GetFollowingAsync(
+    public async Task<Result<PagedResponse<ShortProfileResponse>>> GetFolloweesAsync(
         Guid userId,
         string? cursor,
-        int limit)
+        int limit,
+        CancellationToken cancellationToken = default)
     {
-        var userExists = await userRepository.ExistsUserAsync(userId);
-        if (!userExists)
-            return null;
+        if (limit is <= 0 or > 100)
+            return Result.Fail(new ValidationError("Limit must be greater than 0 and less than 100"));
+
+        var existsUser = await userRepository.ExistsUserAsync(userId, cancellationToken);
+        if (!existsUser)
+            return Result.Fail(new NotFoundError($"User with ID {userId} not found"));
         
-        DateTime timestamp;
-        Guid followerId;
-        Guid followeeId;
+        if (!CursorHelper.TryParseCursor(cursor, out var timestamp, out var followeeId))
+            return Result.Fail(new InvalidCursorError($"Cursor is invalid"));
 
-        if (cursor == null)
+        var shortProfiles = await userRepository
+                .GetFolloweesAsync(userId, timestamp, followeeId, limit + 1, cancellationToken);
+
+        string? nextCursor = null;
+        if (shortProfiles.Count > limit)
         {
-            timestamp = DateTime.UtcNow;
-            followerId = Guid.Empty;
-            followeeId = Guid.Empty;
+            shortProfiles = shortProfiles.SkipLast(1).ToList();
+
+            var lastShortProfile = shortProfiles.Last();
+            nextCursor = CursorHelper.GenerateCursor(lastShortProfile.Timestamp, lastShortProfile.Id);
         }
-        else
-        {
-            (timestamp, followerId, followeeId) = CursorHelper.ParseCursorForFollows(cursor);
-        }
+        
+        var pagedResult = new PagedResponse<ShortProfileResponse>(shortProfiles, nextCursor);
 
-        var follows = (await userRepository
-                .GetFollowingsAsync(userId, timestamp, followerId, followeeId, limit))
-            .ToList();
-
-        var shortProfileModels = follows
-            .Select(f => new ShortProfile
-            {
-                Id = f.Followee.Id,
-                Username = f.Followee.Username,
-                FullName = f.Followee.FullName,
-                ProfileImageUrl = f.Followee.ProfileImageUrl,
-            })
-            .ToList();
-
-        var lastFollow = follows.LastOrDefault();
-        var shortProfiles = new ShortProfiles
-        {
-            Items = shortProfileModels,
-            NextCursor = CursorHelper.GenerateCursor(
-                lastFollow?.CreatedAt ?? DateTime.UtcNow,
-                lastFollow?.FollowerId ?? Guid.Empty,
-                lastFollow?.FolloweeId ?? Guid.Empty),
-        };
-
-        return shortProfiles;
+        return pagedResult;
     }
 }

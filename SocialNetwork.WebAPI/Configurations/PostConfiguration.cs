@@ -29,8 +29,11 @@ public class PostConfiguration : IEntityTypeConfiguration<Post>
         builder.Property(p => p.CreatedAt)
             .HasColumnName("created_at");
 
-        builder.HasOne(p => p.User)
+        builder.HasOne(p => p.Author)
             .WithMany(u => u.Posts)
             .HasForeignKey(p => p.UserId);
+
+        builder.HasIndex(p => new { p.UserId, p.CreatedAt, p.Id })
+            .HasDatabaseName("ix_posts_user_created_at_id");
     }
 }

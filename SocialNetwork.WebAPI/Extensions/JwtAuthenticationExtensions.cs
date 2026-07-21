@@ -1,5 +1,7 @@
 using System.Security.Claims;
+using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.IdentityModel.Tokens;
 
 namespace SocialNetwork.WebAPI.Extensions;
@@ -10,20 +12,54 @@ public static class JwtAuthenticationExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var authority = configuration["Auth0:Domain"]
-            ?? throw new InvalidOperationException("Option Auth0:Domain not found in appsettings.json");
+        var jwtSettings = configuration.GetRequiredSection("JwtSettings");
 
-        var audience = configuration["Auth0:Audience"]
-            ?? throw new InvalidOperationException("Option Auth0:Audience not found in appsettings.json");
+        var secretKey = jwtSettings["Secret"]
+            ?? throw new InvalidOperationException("Option JwtSettings:Secret not found in appsettings.json");
 
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            })
             .AddJwtBearer(options =>
             {
-                options.Authority = $"https://{authority}/";
-                options.Audience = audience;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
-                    NameClaimType = ClaimTypes.NameIdentifier
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = jwtSettings["Issuer"],
+                    ValidAudience = jwtSettings["Audience"],
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+                    NameClaimType = ClaimTypes.NameIdentifier,
+                };
+
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var ticket = context.Request.Query["ticket"];
+                        var path = context.Request.Path;
+
+                        if (!string.IsNullOrWhiteSpace(ticket) && path.StartsWithSegments("/hubs/chat"))
+                        {
+                            var cache = context.HttpContext.RequestServices.GetRequiredService<IMemoryCache>();
+
+                            if (cache.TryGetValue(ticket, out string? userId))
+                            {
+                                cache.Remove(ticket);
+                                
+                                var claims = new[] { new Claim(ClaimTypes.NameIdentifier, userId!) };
+                                var identity = new ClaimsIdentity(claims, context.Scheme.Name);
+                                context.Principal = new ClaimsPrincipal(identity);
+                                context.Success();
+                            }
+                        }
+
+                        return Task.CompletedTask;
+                    }
                 };
             });
 
