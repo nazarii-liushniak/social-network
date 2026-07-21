@@ -2,92 +2,171 @@ using Microsoft.EntityFrameworkCore;
 using SocialNetwork.WebAPI.Data;
 using SocialNetwork.WebAPI.Entities;
 using SocialNetwork.WebAPI.Interfaces.Repositories;
+using SocialNetwork.WebAPI.Models.Post;
+using SocialNetwork.WebAPI.Models.User;
 
 namespace SocialNetwork.WebAPI.Repositories;
 
 public class PostRepository(SocialNetworkDbContext context) :  IPostRepository
 {
-    public async Task<bool> ExistsPostAsync(Guid postId)
+    public async Task<bool> ExistsPostAsync(
+        Guid postId,
+        CancellationToken cancellationToken = default)
     {
         return await context.Posts
-            .AnyAsync(p => p.Id == postId);
+            .AnyAsync(
+                p => p.Id == postId,
+                cancellationToken);
     }
 
-    public async Task AddPostAsync(Post post)
+    public void AddPost(Post post)
     {
-        await context.Posts.AddAsync(post);
-        
-        await context.SaveChangesAsync();
+        context.Posts.Add(post);
     }
 
-    public async Task<Post?> GetPostAsync(Guid postId)
+    public async Task<Post?> GetPostAsync(Guid postId, CancellationToken cancellationToken = default)
     {
-        return await context.Posts.FindAsync(postId);
+        return await context.Posts.FindAsync([postId], cancellationToken);
     }
 
-    public async Task<Post?> GetPostWithCommentsAsync(Guid postId, int commentsLimit)
-    {
-        var post = await context.Posts
-            .Where(p => p.Id == postId)
-            .Include(p => p.User)
-            .Include(p => p.Comments
-                .OrderByDescending(c => c.CreatedAt)
-                .Take(commentsLimit))
-            .ThenInclude(c => c.User)
-            .FirstOrDefaultAsync();
-
-        return post;
-    }
-
-    public async Task<IEnumerable<Post>> GetPostsAsync(
-        Guid userId,
-        DateTime? timestamp,
+    public async Task<PostResponse?> GetPostModelAsync(
+        Guid? currentUserId,
         Guid postId,
-        int limit)
+        CancellationToken cancellationToken = default)
     {
-        var posts = await context.Posts
+        return await context.Posts
+            .Where(p => p.Id == postId)
+            .Select(p => new PostResponse()
+            {
+                Id = p.Id,
+                Content = p.Content,
+                ImageUrl = p.ImageUrl,
+                CommentsCount = p.Comments.Count,
+                LikesCount = p.Likes.Count,
+                IsLikedByMe = currentUserId.HasValue
+                    ? p.Likes.Any(l => l.UserId == currentUserId)
+                    : null,
+                CreatedAt = p.CreatedAt,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<PostWithAuthorResponse?> GetPostWithAuthorAsync(
+        Guid? currentUserId,
+        Guid postId,
+        CancellationToken cancellationToken = default)
+    {
+        return await context.Posts
+            .Where(p => p.Id == postId)
+            .Select(p => new PostWithAuthorResponse()
+            {
+                Id = p.Id,
+                Author = new Author()
+                {
+                    Id = p.Author.Id,
+                    Username = p.Author.Username,
+                    FullName = p.Author.FullName,
+                    ProfileImageUrl = p.Author.ProfileImageUrl,
+                },
+                Content = p.Content,
+                ImageUrl = p.ImageUrl,
+                CommentsCount = p.Comments.Count,
+                LikesCount = p.Likes.Count,
+                IsLikedByMe = currentUserId.HasValue
+                    ? p.Likes.Any(l => l.UserId == currentUserId)
+                    : null,
+                CreatedAt = p.CreatedAt,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<PostResponse>> GetPostsAsync(Guid? currentUserId,
+        Guid userId,
+        DateTimeOffset? timestamp,
+        Guid? postId,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        limit = Math.Clamp(limit, 0, 100);
+
+        var query = context.Posts
             .Where(p => p.UserId == userId)
             .OrderByDescending(p => p.CreatedAt)
             .ThenBy(p => p.Id)
-            .Where(p => p.CreatedAt < timestamp || 
-                        (p.CreatedAt == timestamp && p.Id > postId))
-            .Take(limit)
-            .ToListAsync();
+            .AsQueryable();
+
+        if (timestamp.HasValue && postId.HasValue)
+        {
+            query = query.Where(p => p.CreatedAt < timestamp.Value
+                || (p.CreatedAt == timestamp.Value && p.Id > postId.Value));
+        }
         
-        return posts;
+        return await query
+            .Take(limit)
+            .Select(p => new PostResponse()
+            {
+                Id = p.Id,
+                Content = p.Content,
+                ImageUrl = p.ImageUrl,
+                CommentsCount = p.Comments.Count,
+                LikesCount = p.Likes.Count,
+                IsLikedByMe = currentUserId.HasValue
+                    ? p.Likes.Any(l => l.UserId == currentUserId)
+                    : null,
+                CreatedAt = p.CreatedAt,
+            })
+            .ToListAsync(cancellationToken);
     }
 
-    public async Task<IEnumerable<Post>> GetFeedAsync(
-        Guid userId,
-        DateTime timestamp,
-        Guid postId,
-        int limit)
+    public async Task<IReadOnlyList<PostWithAuthorResponse>> GetFeedAsync(Guid userId,
+        DateTimeOffset? timestamp,
+        Guid? postId,
+        int limit,
+        CancellationToken cancellationToken = default)
     {
-        var posts = await context.Follows
-            .Where(f => f.FollowerId == userId)
-            .SelectMany(f => f.Followee.Posts)
+        limit = Math.Clamp(limit, 0, 100);
+
+        var query = context.Posts
+            .Where(p => context.Follows.Any(f => f.FollowerId == userId && f.FolloweeId == p.UserId))
             .OrderByDescending(p => p.CreatedAt)
             .ThenBy(p => p.Id)
-            .Where(p => p.CreatedAt < timestamp || 
-                        (p.CreatedAt == timestamp && p.Id > postId))
-            .Take(limit)
-            .Include(p => p.User)
-            .ToListAsync();
+            .AsQueryable();
+
+        if (timestamp.HasValue && postId.HasValue)
+        {
+            query = query.Where(p => p.CreatedAt < timestamp.Value
+                || (p.CreatedAt == timestamp.Value && p.Id > postId.Value));
+        }
         
-        return posts;
-    }
-    
-    public async Task SaveChangesAsync()
-    {
-        await context.SaveChangesAsync();
+        return await query
+            .Take(limit)
+            .Select(p => new PostWithAuthorResponse()
+            {
+                Id = p.Id,
+                Author = new Author()
+                {
+                    Id = p.Author.Id,
+                    Username = p.Author.Username,
+                    FullName = p.Author.FullName,
+                    ProfileImageUrl = p.Author.ProfileImageUrl,
+                },
+                Content = p.Content,
+                ImageUrl = p.ImageUrl,
+                CommentsCount = p.Comments.Count,
+                LikesCount = p.Likes.Count,
+                IsLikedByMe = p.Likes.Any(l => l.UserId == userId),
+                CreatedAt = p.CreatedAt,
+            })
+            .ToListAsync(cancellationToken);
     }
 
-    public async Task<bool> DeletePostAsync(Guid postId)
+    public void DeletePost(Post post)
     {
-        var deletedRows = await context.Posts
-            .Where(p => p.Id == postId)
-            .ExecuteDeleteAsync();
+        context.Posts.Remove(post);
+    }
 
-        return deletedRows > 0;
+    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        await context.SaveChangesAsync(cancellationToken);
     }
 }
