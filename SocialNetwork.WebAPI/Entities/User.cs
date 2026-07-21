@@ -9,7 +9,7 @@ public class User
     public string? FullName { get; set; }
     public string? Description { get; set; }
     public string? ProfileImageUrl { get; set; }
-    public DateTime CreatedAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
 
     public ICollection<Comment> Comments { get; set; } = new HashSet<Comment>();
     public ICollection<Follow> Followers { get; set; } = new HashSet<Follow>();
@@ -18,4 +18,5 @@ public class User
     public ICollection<Message> SentMessages { get; set; } = new HashSet<Message>();
     public ICollection<Message> ReceivedMessages { get; set; } = new HashSet<Message>();
     public ICollection<Post> Posts { get; set; } = new HashSet<Post>();
+    public ICollection<RefreshToken> RefreshTokens { get; set; } = new HashSet<RefreshToken>();
 }

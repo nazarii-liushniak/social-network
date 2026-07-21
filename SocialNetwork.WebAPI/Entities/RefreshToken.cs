@@ -1,11 +1,10 @@
 namespace SocialNetwork.WebAPI.Entities;
 
-public class Like
+public class RefreshToken
 {
-    public Guid PostId { get; set; }
+    public Guid Token { get; set; }
     public Guid UserId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 
-    public Post Post { get; set; } = null!;
     public User User { get; set; } = null!;
 }
