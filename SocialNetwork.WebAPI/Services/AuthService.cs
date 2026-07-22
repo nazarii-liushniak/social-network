@@ -1,4 +1,5 @@
 using FluentResults;
+using Microsoft.Extensions.Options;
 using SocialNetwork.WebAPI.Entities;
 using SocialNetwork.WebAPI.Errors;
 using SocialNetwork.WebAPI.Helpers;
@@ -7,13 +8,14 @@ using SocialNetwork.WebAPI.Interfaces.Repositories;
 using SocialNetwork.WebAPI.Interfaces.Services;
 using SocialNetwork.WebAPI.Models;
 using SocialNetwork.WebAPI.Models.User;
+using SocialNetwork.WebAPI.Settings;
 
 namespace SocialNetwork.WebAPI.Services;
 
 public class AuthService(
     TimeProvider timeProvider,
     IUserContext userContext,
-    IConfiguration configuration,
+    IOptions<AuthSettings> authSettings,
     ITokenService tokenService,
     IUserRepository userRepository,
     IRefreshTokenRepository refreshTokenRepository) : IAuthService
@@ -159,9 +161,7 @@ public class AuthService(
 
     private bool IsRefreshTokenExpired(RefreshToken refreshToken)
     {
-        var refreshTokenExpirationDaysString = configuration["RefreshTokenExpirationDays"]
-            ?? throw new InvalidOperationException("Refresh token expiration days are missing in appsettings.json.");
-        var refreshTokenExpirationDays = int.Parse(refreshTokenExpirationDaysString);
+        var refreshTokenExpirationDays = authSettings.Value.RefreshTokenExpirationDays;
         
         return timeProvider.GetUtcNow() - refreshToken.CreatedAt > TimeSpan.FromDays(refreshTokenExpirationDays);
     }
