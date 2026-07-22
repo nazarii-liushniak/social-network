@@ -2,22 +2,20 @@ using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using SocialNetwork.WebAPI.Interfaces.Services;
+using SocialNetwork.WebAPI.Settings;
 
 namespace SocialNetwork.WebAPI.Services;
 
 public class TokenService(
     TimeProvider timeProvider,
-    IConfiguration configuration) : ITokenService
+    IOptions<JwtSettings> jwtSettings) : ITokenService
 {
     public string GenerateToken(Guid userId)
     {
-        var jwtSettings = configuration.GetRequiredSection("JwtSettings");
-        var secretKey = jwtSettings["Secret"]
-            ?? throw new InvalidOperationException("JWT secret not found in appsettings.json");
-        
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Value.Secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var claims = new[]
@@ -27,11 +25,10 @@ public class TokenService(
         };
 
         var token = new JwtSecurityToken(
-            issuer: jwtSettings["Issuer"],
-            audience: jwtSettings["Audience"],
+            issuer: jwtSettings.Value.Issuer,
+            audience: jwtSettings.Value.Audience,
             claims: claims,
-            expires: timeProvider.GetUtcNow().AddMinutes(double.Parse(jwtSettings["ExpiryMinutes"]
-                ?? throw new InvalidOperationException("JwtSettings:ExpiryMinutes not found in appsettings.json"))).UtcDateTime,
+            expires: timeProvider.GetUtcNow().AddMinutes(jwtSettings.Value.ExpiryMinutes).UtcDateTime,
             signingCredentials: credentials
         );
 
