@@ -3,6 +3,7 @@ using SocialNetwork.WebAPI.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddSettingsOptions();
 builder.Services.AddDbContext(builder.Configuration);
 builder.Services.AddRepositories();
 builder.Services.AddServices();
