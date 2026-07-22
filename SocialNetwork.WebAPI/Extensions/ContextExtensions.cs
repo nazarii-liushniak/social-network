@@ -5,8 +5,10 @@ namespace SocialNetwork.WebAPI.Extensions;
 
 public static class ContextExtensions
 {
-    public static void AddContexts(this IServiceCollection services)
+    public static IServiceCollection AddContexts(this IServiceCollection services)
     {
         services.AddScoped<IUserContext, UserContext>();
+
+        return services;
     }
 }
