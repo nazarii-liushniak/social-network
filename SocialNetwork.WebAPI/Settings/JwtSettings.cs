@@ -12,6 +12,6 @@ public class JwtSettings
     public required string Issuer { get; set; }
     [Required, Url]
     public required string Audience { get; set; }
-    [Required, Range(0, int.MaxValue)]
+    [Required, Range(1, int.MaxValue)]
     public int ExpiryMinutes { get; set; }
 }
